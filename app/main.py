@@ -56,6 +56,7 @@ async def _lifecycle(app: web.Application):
     if not settings.bot_username:
         settings.bot_username = me.username or ""
     log.info("bot_started", bot=me.username, test_mode=settings.test_mode)
+    await _check_admin_chat(bot, settings)
 
     polling_task: asyncio.Task | None = None
     if settings.webhook_url:
@@ -84,6 +85,23 @@ async def _lifecycle(app: web.Application):
     await app[REDIS].aclose()
     await app[ENGINE].dispose()
     log.info("bot_stopped")
+
+
+async def _check_admin_chat(bot: Bot, settings: Settings) -> None:
+    """Без чата организаторов бот работает, но алерты и вопросы участников уйдут в никуда — предупреждаем."""
+    if not settings.admin_chat_id:
+        log.warning("admin_chat_not_configured")
+        return
+    try:
+        chat = await bot.get_chat(settings.admin_chat_id)
+        log.info("admin_chat_ok", chat_id=chat.id, title=chat.title)
+    except Exception as exc:
+        log.warning(
+            "admin_chat_unreachable",
+            chat_id=settings.admin_chat_id,
+            error=str(exc),
+            hint="бот должен быть в чате; у групп-супергрупп ID начинается с -100",
+        )
 
 
 def main() -> None:

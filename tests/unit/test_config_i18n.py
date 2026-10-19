@@ -14,6 +14,12 @@ def test_superadmin_ids_from_comma_list(monkeypatch):
     assert s.superadmin_ids == frozenset({111, 222, 333})
 
 
+def test_admin_chat_id_tolerates_copy_paste(monkeypatch):
+    for raw, expected in [("-1001234567890", -1001234567890), (" #-100123 ", -100123), ("", None), ("  ", None)]:
+        monkeypatch.setenv("ADMIN_CHAT_ID", raw)
+        assert Settings(_env_file=None).admin_chat_id == expected
+
+
 def test_webhook_url(monkeypatch):
     monkeypatch.setenv("WEBHOOK_BASE_URL", "https://bot.example.com/")
     s = Settings(_env_file=None)

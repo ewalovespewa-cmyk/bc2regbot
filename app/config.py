@@ -58,6 +58,15 @@ class Settings(BaseSettings):
             return frozenset(int(x) for x in value.replace(" ", "").split(",") if x)
         return value
 
+    @field_validator("admin_chat_id", mode="before")
+    @classmethod
+    def _parse_chat_id(cls, value: object) -> object:
+        # Терпим то, что обычно копируют из адресной строки web.telegram.org: "#-100123", пробелы, пусто.
+        if isinstance(value, str):
+            value = value.strip().lstrip("#").replace(" ", "")
+            return value or None
+        return value
+
     @field_validator("database_url")
     @classmethod
     def _asyncpg_url(cls, value: str) -> str:

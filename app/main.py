@@ -16,6 +16,7 @@ from app.config import Settings, get_settings
 from app.db.session import create_engine, create_sessionmaker
 from app.logs import get_logger, setup_logging
 from app.redis import create_redis
+from app.web import pages
 from app.web.health import health
 from app.web.keys import BOT, DISPATCHER, ENGINE, REDIS, SESSIONMAKER, SETTINGS
 from app.workers.jobs import all_jobs
@@ -40,6 +41,7 @@ def build_app(settings: Settings) -> web.Application:
     app[DISPATCHER] = dp
 
     app.router.add_get("/health", health)
+    pages.register(app)
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
@@ -61,6 +63,7 @@ async def _lifecycle(app: web.Application):
     await _check_admin_chat(bot, settings)
     await _set_commands(bot)
     await _set_admin_commands(bot, app[SESSIONMAKER], settings)
+    await _seed_days(app[SESSIONMAKER], settings)
 
     polling_task: asyncio.Task | None = None
     if settings.webhook_url:
@@ -125,6 +128,16 @@ async def _set_admin_commands(bot: Bot, sessionmaker, settings: Settings) -> Non
         await apply_admin_commands(bot, uid, Role.SUPERADMIN)
     for admin in admins:
         await apply_admin_commands(bot, admin.telegram_user_id, admin.role)
+
+
+async def _seed_days(sessionmaker, settings: Settings) -> None:
+    from app.services.checkin import seed_event_days
+
+    async with sessionmaker() as session:
+        created = await seed_event_days(session, settings)
+        await session.commit()
+    if created:
+        log.info("event_days_seeded", created=created)
 
 
 async def _check_admin_chat(bot: Bot, settings: Settings) -> None:

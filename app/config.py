@@ -67,6 +67,13 @@ class Settings(BaseSettings):
     auto_import_minutes: int = 30
     sheets_timeout_seconds: int = 30
 
+    # Дни мероприятия: создаются при старте, если их ещё нет в БД (дальше админ правит командой /day).
+    # Время — местное (TIMEZONE).
+    event_days: list[dict[str, str]] = [
+        {"date": "2026-11-14", "label": "День 1", "opens": "08:00", "closes": "13:00"},
+        {"date": "2026-11-15", "label": "День 2", "opens": "08:00", "closes": "13:00"},
+    ]
+
     @field_validator("sheet_selected_values", mode="before")
     @classmethod
     def _parse_values(cls, value: object) -> object:

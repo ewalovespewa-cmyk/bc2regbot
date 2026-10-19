@@ -4,12 +4,16 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 
 from app.config import Settings
 from app.i18n import SUPPORTED_LANGS, t
 
-MENU_ITEMS = ("status", "schedule", "location", "faq", "contacts", "ask", "language")
+MENU_ITEMS = ("status", "checkin", "schedule", "location", "faq", "contacts", "ask", "language")
+
+# Адрес Mini App со сканером QR. Задаётся при сборке диспетчера, если у бота есть HTTPS-адрес.
+WEBAPP_URL: str | None = None
 
 
 def menu_text(key: str):
@@ -19,9 +23,12 @@ def menu_text(key: str):
 
 def main_menu(lang: str) -> ReplyKeyboardMarkup:
     b = lambda key: KeyboardButton(text=t(f"menu.{key}", lang))  # noqa: E731
+    checkin = (
+        KeyboardButton(text=t("menu.checkin", lang), web_app=WebAppInfo(url=WEBAPP_URL)) if WEBAPP_URL else b("checkin")
+    )
     return ReplyKeyboardMarkup(
         keyboard=[
-            [b("status")],
+            [checkin, b("status")],
             [b("schedule"), b("location")],
             [b("faq"), b("contacts")],
             [b("ask"), b("language")],

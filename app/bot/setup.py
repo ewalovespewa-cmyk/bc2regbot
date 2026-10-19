@@ -12,6 +12,7 @@ from app.bot.handlers import (
     admin_content,
     admin_import,
     admin_panel,
+    checkin,
     menu,
     polls,
     questions,
@@ -41,6 +42,10 @@ def create_dispatcher(
     sessionmaker: async_sessionmaker[AsyncSession],
     settings: Settings,
 ) -> Dispatcher:
+    from app.bot import keyboards
+
+    https = settings.webhook_base_url.startswith("https://")
+    keyboards.WEBAPP_URL = f"{settings.webhook_base_url}/webapp/scan" if https else None
     storage = RedisStorage(redis, key_builder=DefaultKeyBuilder(with_bot_id=True), state_ttl=7 * 86400, data_ttl=7 * 86400)
     dp = Dispatcher(storage=storage, redis=redis, sessionmaker=sessionmaker, settings=settings)
 
@@ -60,6 +65,7 @@ def create_dispatcher(
         admin_content.router,
         admin_broadcast.router,
         polls.router,
+        checkin.router,
         questions.admin_router,
         start.router,
         questions.router,  # раньше меню: состояние «пишу вопрос» важнее кнопок

@@ -36,6 +36,7 @@ start:
   only_registered: "This is available to participants only. Tap /start to link your account."
 
 menu:
+  checkin: "✅ Check in"
   title: "Menu 👇"
   status: "👤 My status"
   schedule: "🗓 Schedule"
@@ -87,6 +88,21 @@ poll:
   skip: "Skip"
   reason_thanks: "Thank you, noted 🙏"
   reason_skipped: "OK, no reason."
+
+checkin:
+  ok_team: "✅ <b>You are checked in!</b> Day {day}.\nTeam {team}: {present}/{total} here."
+  ok_solo: "✅ <b>You are checked in!</b> Day {day}. Have a great hackathon!"
+  bingo: "🎲 Bingo is open — your card is waiting in the games bot."
+  open_bingo: "🎲 Open bingo"
+  already: "You are already checked in at {time} 👌"
+  expired: "⏱ The QR code has expired — scan the screen at the entrance again."
+  closed: "Check-in is closed right now. If you are at the entrance, ask a volunteer."
+  need_link: "Almost done! Let us link your account first (button above) — and I will check you in right away."
+  too_many: "Too many attempts. Please ask a volunteer at the entrance or tap the button below."
+  call_organizer: "🙋 Call an organizer"
+  called: "We told the organizers — someone will come to you. Please wait at the entrance 🙏"
+  phone_mismatch: "If you are at the entrance and your Telegram number differs from the application, call an organizer and they will check you in manually."
+  scan_with_camera: "Point your phone camera at the QR on the screen at the entrance — Telegram will open the bot and check you in."
 
 commands:
   start: "Start / link your account"

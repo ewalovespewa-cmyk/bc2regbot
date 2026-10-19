@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business Cup 2.0 · Чекин</title>
+<style>
+  :root { --bg: #0d0f14; --fg: #f4f5f7; --muted: #9aa1ad; --accent: #4ade80; --card: #ffffff; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; align-items: center;
+    justify-items: center; padding: 3vh 4vw; gap: 2vh; text-align: center; }
+  h1 { margin: 0; font-size: clamp(28px, 4.5vw, 64px); letter-spacing: -0.02em; }
+  .day { color: var(--muted); font-size: clamp(18px, 2.2vw, 32px); margin-top: .4em; }
+  .qr { background: var(--card); padding: 2vh; border-radius: 24px; line-height: 0; }
+  .qr svg { width: min(62vh, 80vw); height: auto; display: block; }
+  .hint { font-size: clamp(18px, 2.4vw, 34px); margin-top: 1.5vh; }
+  .timer { color: var(--muted); font-size: clamp(14px, 1.6vw, 22px); margin-top: .6vh; font-variant-numeric: tabular-nums; }
+  .bar { height: 6px; width: min(62vh, 80vw); background: #262a33; border-radius: 3px; overflow: hidden; margin: 1vh auto 0; }
+  .bar > div { height: 100%; background: var(--accent); transition: width 1s linear; }
+  .counter { font-size: clamp(22px, 3vw, 44px); font-variant-numeric: tabular-nums; }
+  .counter b { color: var(--accent); }
+  .closed { font-size: clamp(28px, 4vw, 56px); color: var(--muted); }
+  .error { color: #f87171; font-size: 14px; min-height: 1em; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Business Cup 2.0</h1>
+    <div class="day" id="day">&nbsp;</div>
+  </header>
+  <section id="content"><div class="closed">Загрузка…</div></section>
+  <footer>
+    <div class="counter" id="counter">&nbsp;</div>
+    <div class="error" id="error"></div>
+  </footer>
+</main>
+<script>
+  const key = new URLSearchParams(location.search).get("key") || "";
+  const el = (id) => document.getElementById(id);
+  let secondsLeft = 0, lastSvg = "";
+
+  function render(s) {
+    el("day").textContent = s.day ? s.day : "";
+    el("counter").innerHTML = `Отмечено <b>${s.checked}</b> из ${s.total}`;
+    if (s.state !== "open") {
+      const text = { closed: "Чекин сейчас закрыт", screen_off: "Экран выключен",
+                     misconfigured: "Не настроен CHECKIN_SECRET или имя бота" }[s.state] || "Чекин закрыт";
+      el("content").innerHTML = `<div class="closed">${text}</div>`;
+      lastSvg = "";
+      return;
+    }
+    secondsLeft = s.seconds_left;
+    if (s.svg !== lastSvg) {
+      el("content").innerHTML = `<div class="qr">${s.svg}</div>
+        <div class="hint">📱 Наведи камеру телефона на QR — Telegram отметит тебя</div>
+        <div class="bar"><div id="bar"></div></div><div class="timer" id="timer"></div>`;
+      lastSvg = s.svg;
+    }
+    tick();
+  }
+
+  function tick() {
+    const timer = el("timer"), bar = el("bar");
+    if (!timer) return;
+    timer.textContent = `Код обновится через ${secondsLeft} с`;
+    bar.style.width = `${Math.max(0, secondsLeft) / 30 * 100}%`;
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch(`/checkin-screen/state?key=${encodeURIComponent(key)}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      render(await r.json());
+      el("error").textContent = "";
+    } catch (e) {
+      el("error").textContent = "Нет связи с сервером, пробую снова…";
+    }
+  }
+
+  setInterval(() => { secondsLeft -= 1; tick(); if (secondsLeft <= 0) poll(); }, 1000);
+  setInterval(poll, 5000);
+  poll();
+</script>
+</body>
+</html>

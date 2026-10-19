@@ -39,12 +39,14 @@ def _btn(text: str, data: str) -> InlineKeyboardButton:
 def admin_menu_keyboard(role: Role) -> InlineKeyboardMarkup:
     rows = [[_btn("🔎 Найти участника", "adm:find")]]
     if has_role(role, Role.ADMIN):
+        rows.append([_btn("📊 Статистика", "adm:stats"), _btn("✅ Чекин: дни и экран", "adm:days")])
+    if has_role(role, Role.ADMIN):
         rows.append([_btn("📤 Выгрузка CSV", "adm:export"), _btn("🔄 В Google Sheet", "adm:sync")])
         rows.append([_btn("📣 Рассылка", "adm:broadcast"), _btn("📋 Опрос явки", "adm:poll")])
         rows.append([_btn("📝 Контент", "adm:content"), _btn("📞 Обзвон", "adm:calls")])
     if has_role(role, Role.SUPERADMIN):
         rows.append([_btn("📥 Импорт", "adm:import"), _btn("👥 Админы", "adm:admins")])
-        rows.append([_btn("🧾 Журнал действий", "adm:audit")])
+        rows.append([_btn("🧾 Журнал действий", "adm:audit"), _btn("🚨 Подозрительное", "adm:suspicious")])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -80,7 +82,7 @@ async def on_import_button(callback: CallbackQuery, settings: Settings) -> None:
 
 @router.callback_query(
     F.data.in_({"adm:export", "adm:sync", "adm:content", "adm:admins", "adm:audit", "adm:broadcast", "adm:poll",
-                "adm:calls", "adm:stats", "adm:checkin"})
+                "adm:calls", "adm:stats", "adm:days", "adm:suspicious"})
 )
 async def on_shortcut(callback: CallbackQuery) -> None:
     """Кнопки-ярлыки: подсказываем команду, сами команды проверяют роль."""
@@ -214,9 +216,11 @@ async def on_find_query(message: Message, state: FSMContext, session: AsyncSessi
     await _send_results(message, session, message.text)
 
 
-def card_keyboard(p: Participant, role: Role) -> InlineKeyboardMarkup | None:
-    rows = [[_btn("📞 Результат обзвона", f"pc:ask:{p.id}")]]
-    # Этап 7 добавляет «✅ Отметить сегодня» (см. checkin_card_rows).
+def card_keyboard(p: Participant, role: Role, day=None, checked: bool = False) -> InlineKeyboardMarkup | None:
+    from app.bot.handlers.checkin import checkin_card_rows
+
+    rows = checkin_card_rows(p, role, day, checked)
+    rows.append([_btn("📞 Результат обзвона", f"pc:ask:{p.id}")])
     if has_role(role, Role.SUPERADMIN) and p.telegram_user_id:
         rows.append([_btn("🔓 Отвязать Telegram", f"p:unlink:{p.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
@@ -228,8 +232,13 @@ async def on_card(callback: CallbackQuery, session: AsyncSession, settings: Sett
     if p is None:
         await callback.answer("Участник не найден", show_alert=True)
         return
+    from app.bot.handlers.checkin import checked_today
+    from app.services.checkin import today_day
+
+    day = await today_day(session, settings)
     await callback.message.answer(
-        await participant_card(session, p, role, settings.timezone), reply_markup=card_keyboard(p, role)
+        await participant_card(session, p, role, settings.timezone),
+        reply_markup=card_keyboard(p, role, day, await checked_today(session, p.id, day)),
     )
     await callback.answer()
 

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Business Cup 2.0 · Дашборд</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root { --bg: #f6f7f9; --card: #fff; --fg: #15171c; --muted: #6b7280; --line: #e5e7eb;
+    --ok: #16a34a; --part: #d97706; --none: #9ca3af; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1115; --card: #171a21; --fg: #eef0f3; --muted: #9aa1ad; --line: #2a2f39; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 20px 16px 40px; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; justify-content: space-between; }
+  h1 { margin: 0; font-size: 22px; }
+  .muted { color: var(--muted); font-size: 13px; }
+  select, input { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--line);
+    background: var(--card); color: var(--fg); }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+  .tile { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .tile .v { font-size: 30px; font-weight: 650; font-variant-numeric: tabular-nums; }
+  .tile .l { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 12px; }
+  @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card h2 { font-size: 15px; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  td, th { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .full { background: var(--ok); } .part { background: var(--part); } .none { background: var(--none); }
+  .members { color: var(--muted); font-size: 12px; }
+  .members .here { color: var(--ok); }
+  .scroll { overflow-x: auto; }
+  canvas { max-height: 260px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Business Cup 2.0 · Чекин</h1>
+    <div><select id="day"></select> <span class="muted" id="updated"></span></div>
+  </header>
+  <div class="tiles">
+    <div class="tile"><div class="v" id="checked">—</div><div class="l">отмечено</div></div>
+    <div class="tile"><div class="v" id="pct">—</div><div class="l">от отобранных</div></div>
+    <div class="tile"><div class="v" id="full">—</div><div class="l">команд в полном составе</div></div>
+    <div class="tile"><div class="v" id="partial">—</div><div class="l">команд частично</div></div>
+    <div class="tile"><div class="v" id="none">—</div><div class="l">команд — никого</div></div>
+    <div class="tile"><div class="v" id="linked">—</div><div class="l">привязали бота</div></div>
+  </div>
+  <div class="grid">
+    <div class="card"><h2>Чекины по времени (10 мин)</h2><canvas id="chart"></canvas></div>
+    <div class="card"><h2>Последние отметки</h2><table id="recent"></table></div>
+  </div>
+  <div class="card" style="margin-top:12px">
+    <h2>Команды <input id="q" placeholder="Поиск по команде или имени" style="margin-left:8px; width:min(320px,100%)"></h2>
+    <div class="scroll"><table id="teams"></table></div>
+  </div>
+</div>
+<script>
+  const key = new URLSearchParams(location.search).get("key") || "";
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let data = null, chart = null, dayId = new URLSearchParams(location.search).get("day") || "";
+
+  function status(t) { return t.present === t.total ? "full" : t.present > 0 ? "part" : "none"; }
+
+  function renderTeams() {
+    if (!data || !data.teams) { $("teams").innerHTML = ""; return; }
+    const q = $("q").value.trim().toLowerCase();
+    const rows = data.teams.filter((t) => !q || t.name.toLowerCase().includes(q) ||
+      t.members.some((m) => m.name.toLowerCase().includes(q)));
+    $("teams").innerHTML = "<tr><th>Команда</th><th>На месте</th><th>Состав</th></tr>" + rows.map((t) =>
+      `<tr><td><span class="dot ${status(t)}"></span>${esc(t.name)}</td><td>${t.present}/${t.total}</td>
+       <td class="members">${t.members.map((m) => `<span class="${m.here ? "here" : ""}">${m.here ? "✓" : "·"} ${esc(m.name)}</span>`).join(", ")}</td></tr>`
+    ).join("");
+  }
+
+  function render() {
+    $("updated").textContent = `обновлено ${data.generated_at}`;
+    $("day").innerHTML = data.days.map((d) =>
+      `<option value="${d.id}" ${data.day && d.id === data.day.id ? "selected" : ""}>${esc(d.label)}${d.open ? " · открыт" : ""}</option>`).join("");
+    $("linked").textContent = `${data.linked}/${data.total}`;
+    if (!data.day) return;
+    $("checked").textContent = data.checked;
+    $("pct").textContent = data.total ? `${Math.round(100 * data.checked / data.total)}%` : "—";
+    $("full").textContent = data.teams_full;
+    $("partial").textContent = data.teams_partial;
+    $("none").textContent = data.teams_none;
+    $("recent").innerHTML = data.recent.map((r) =>
+      `<tr><td>${r.time}</td><td>${esc(r.name)}<div class="members">${esc(r.team)} · ${r.method}</div></td></tr>`).join("") ||
+      "<tr><td class='muted'>Пока никого</td></tr>";
+    const labels = data.timeline.map((p) => p.t), values = data.timeline.map((p) => p.n);
+    if (window.Chart) {
+      if (!chart) {
+        chart = new Chart($("chart"), { type: "bar", data: { labels, datasets: [{ data: values, backgroundColor: "#16a34a" }] },
+          options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }, animation: false } });
+      } else {
+        chart.data.labels = labels; chart.data.datasets[0].data = values; chart.update();
+      }
+    }
+    renderTeams();
+  }
+
+  async function load() {
+    try {
+      const r = await fetch(`/dashboard/data?key=${encodeURIComponent(key)}&day=${encodeURIComponent(dayId)}`, { cache: "no-store" });
+      if (!r.ok) throw new Error(r.status);
+      data = await r.json();
+      render();
+    } catch (e) {
+      $("updated").textContent = "нет связи с сервером…";
+    }
+  }
+
+  $("q").addEventListener("input", renderTeams);
+  $("day").addEventListener("change", (e) => { dayId = e.target.value; load(); });
+  setInterval(load, 10000);
+  load();
+</script>
+</body>
+</html>

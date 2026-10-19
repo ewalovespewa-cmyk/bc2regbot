@@ -13,7 +13,8 @@ from app.bot.states import LinkStates
 from app.config import Settings
 from app.db.models import Participant
 from app.i18n import t
-from app.services import ratelimit, security
+from app.bot.checkin_flow import call_organizer_keyboard, finish_pending, handle_code
+from app.services import checkin_codes, ratelimit, security
 from app.services.importer import team_display_name
 from app.services.linking import LinkResult, LinkStatus, TelegramUser, link_by_contact, link_by_token
 from app.services.normalize import normalize_phone
@@ -68,14 +69,17 @@ async def _handle_result(
     contact = settings.organizer_contact
     report = dict(session=session, bot=bot, redis=redis, settings=settings, telegram_user_id=user.id, username=user.username)
 
+    pending = (await state.get_data()).get("pending_checkin")
+    await state.clear()
     if result.ok:
-        await state.clear()
         await send_welcome(message, result.participant, settings, first_time=result.status == LinkStatus.LINKED)
+        await finish_pending(message, pending, result.participant, session, settings)
         return
 
-    await state.clear()
     if result.status == LinkStatus.NOT_FOUND:
         await message.answer(t("start.not_found", lang, contact=contact), reply_markup=ReplyKeyboardRemove())
+        if pending:  # человек на входе, а номер не совпал — пусть позовёт волонтёра
+            await message.answer(t("checkin.phone_mismatch", lang), reply_markup=call_organizer_keyboard(lang))
     elif result.status == LinkStatus.TOKEN_TAKEN:
         p = result.participant
         await message.answer(t("start.token_taken", lang, contact=contact), reply_markup=ReplyKeyboardRemove())
@@ -119,6 +123,12 @@ async def start_with_payload(
     lang: str,
 ) -> None:
     payload = (command.args or "").strip()
+    if payload.startswith(checkin_codes.PREFIX):
+        await handle_code(
+            message, checkin_codes.extract_code(payload), state=state, session=session, bot=bot, redis=redis,
+            settings=settings, participant=participant, lang=lang,
+        )
+        return
     if is_invite_token(payload):
         result = await link_by_token(session, _tg_user(message.from_user), payload)
         if result.status != LinkStatus.NOT_FOUND:

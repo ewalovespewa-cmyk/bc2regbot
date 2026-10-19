@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Чекин</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; padding: 24px 16px; text-align: center;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #111); }
+  h1 { font-size: 22px; margin: 8px 0 12px; }
+  p { color: var(--tg-theme-hint-color, #777); font-size: 15px; line-height: 1.45; }
+  button { margin-top: 20px; width: 100%; max-width: 360px; padding: 14px; font-size: 17px; border: 0; border-radius: 12px;
+    background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); }
+  .err { color: #e5484d; }
+</style>
+</head>
+<body>
+  <h1>✅ Чекин Business Cup 2.0</h1>
+  <p id="msg">Наведи камеру на QR на экране у входа.</p>
+  <button id="scan" hidden>📷 Сканировать QR</button>
+<script>
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const msg = document.getElementById("msg");
+  const button = document.getElementById("scan");
+
+  function scan() {
+    tg.showScanQrPopup({ text: "Наведи камеру на QR на экране у входа" }, (text) => {
+      if (text && text.includes("start=ci_")) {
+        tg.sendData(text);  // бот получит данные и отметит; Mini App закроется сам
+        return true;
+      }
+      msg.textContent = "Это не QR чекина. Отсканируй QR на экране у входа.";
+      msg.className = "err";
+      return true;
+    });
+  }
+
+  if (tg && tg.isVersionAtLeast && tg.isVersionAtLeast("6.4") && tg.platform !== "tdesktop" && tg.platform !== "macos") {
+    tg.ready();
+    tg.expand();
+    button.hidden = false;
+    button.onclick = scan;
+    scan();
+  } else {
+    msg.innerHTML = "Сканер в этом приложении недоступен.<br>Открой камеру телефона и наведи её на QR на экране — Telegram откроет бота и отметит тебя.";
+    if (tg) tg.ready();
+  }
+</script>
+</body>
+</html>

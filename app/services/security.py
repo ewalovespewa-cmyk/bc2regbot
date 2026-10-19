@@ -18,6 +18,8 @@ ACCOUNT_LINKED_TO_OTHER = "account_linked_to_other"
 FOREIGN_CONTACT = "foreign_contact"
 AMBIGUOUS_PHONE = "ambiguous_phone"
 INVALID_TOKEN_FLOOD = "invalid_token_flood"
+INVALID_CODE_FLOOD = "invalid_code_flood"
+HELP_AT_ENTRANCE = "help_at_entrance"
 
 TITLES = {
     TOKEN_OWNED_BY_OTHER: "Попытка привязать чужую ссылку",
@@ -25,6 +27,8 @@ TITLES = {
     FOREIGN_CONTACT: "Прислан чужой контакт",
     AMBIGUOUS_PHONE: "Один номер у нескольких участников",
     INVALID_TOKEN_FLOOD: "Много попыток с неверными ссылками",
+    INVALID_CODE_FLOOD: "Много попыток чекина с неверным QR",
+    HELP_AT_ENTRANCE: "🙋 Нужна помощь на входе",
 }
 
 

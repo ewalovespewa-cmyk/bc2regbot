@@ -1,5 +1,88 @@
 start:
   hello: "Hi! This is the Business Cup 2.0 participant bot. Registration, news and check-in are coming soon."
+  welcome: |-
+    🎉 <b>{name}, you're on the Business Cup 2.0 participant list!</b>
+
+    {team_line}
+
+    Here you'll get announcements, reminders, attendance confirmation and check-in at the entrance. Everything is in the menu below 👇
+  welcome_team: "Team: <b>{team}</b>"
+  welcome_solo: "You're participating solo — you can team up on site."
+  welcome_back: "Welcome back, {name}! The menu is below 👇"
+  games_hint: "While you wait — jump into the games: the photo hunt and the expedition are already open 🎮"
+  ask_contact: |-
+    This bot is for selected Business Cup 2.0 participants.
+
+    If you were selected, tap the button below and the bot will match your phone number with your application. The easiest way is the personal link from your email.
+  contact_button: "📱 Share contact"
+  not_found: |-
+    We couldn't find you on the participant list 😔
+
+    If this is a mistake, contact the organizers: {contact}
+  foreign_contact: "Please share <b>your own</b> contact with the button below, not someone else's."
+  token_taken: |-
+    This link is already linked to another Telegram account.
+
+    If it's your link, contact the organizers: {contact}
+  account_taken: |-
+    Your Telegram is already linked to another participant ({name}).
+
+    If this is a mistake, contact the organizers: {contact}
+  ambiguous: |-
+    We found several applications with this number and couldn't link automatically.
+
+    Open the bot with the personal link from your email or contact the organizers: {contact}
+  too_many_attempts: "Too many attempts. Try again in {minutes} min or contact the organizers: {contact}"
+  only_registered: "This is available to participants only. Tap /start to link your account."
+
+menu:
+  title: "Menu 👇"
+  status: "👤 My status"
+  schedule: "🗓 Schedule"
+  location: "📍 Location"
+  faq: "❓ FAQ"
+  contacts: "☎️ Contacts"
+  ask: "✉️ Ask a question"
+  language: "🌐 Русский"
+  games: "🎮 Games"
+  games_chat: "💬 Group chat"
+  unknown: "Sorry, I didn't get that 🙂 Pick an item from the menu below."
+  language_switched: "Language: English 🇬🇧"
+
+status:
+  title: "👤 <b>My status</b>"
+  name: "Name: <b>{name}</b>"
+  team: "Team: <b>{team}</b>"
+  solo: "Team: solo"
+  you: " (you)"
+  team_legend: "<i>✅ in the bot · ⏳ hasn't opened the bot yet</i>"
+  attendance: "“Are you coming?” answer: <b>{answer}</b>"
+  attendance_none: "The “Are you coming?” poll hasn't started yet or you haven't answered."
+  checkins: "\nCheck-in:"
+  checked_at: "✅ checked in at {time}"
+  not_checked: "—"
+
+content:
+  schedule: "🗓 The schedule will be published closer to the event. Business Cup 2.0 takes place on November 14–15."
+  location: "📍 <b>Nazarbayev University</b>\nAstana, 53 Kabanbay Batyr Ave"
+  faq: "❓ Answers to common questions are coming soon. Meanwhile, ask your own with “✉️ Ask a question”."
+  contacts: "☎️ Organizers: {contact}"
+
+question:
+  prompt: "Send your question in one message (a photo is fine). The organizers will reply right here in the bot."
+  cancel: "Cancel"
+  cancelled: "OK, cancelled."
+  sent: "✅ Your question was sent to the organizers. The answer will come here."
+  unsupported: "Please send text or a photo with a caption."
+  too_long: "Too long — please keep it under {limit} characters."
+  rate_limited: "You've asked several questions in a row. Please wait {minutes} min 🙏"
+  no_admin_chat: "Questions aren't accepted right now. Contact the organizers directly: {contact}"
+  answer: "💬 <b>Reply from the organizers</b>\n\n{answer}"
+
+commands:
+  start: "Start / link your account"
+  menu: "Show the menu"
+  status: "My status"
 
 errors:
   generic: "Something went wrong 😔 We're already on it. Please try again a bit later."

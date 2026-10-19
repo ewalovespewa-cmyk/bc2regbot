@@ -7,9 +7,10 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bot import errors
-from app.bot.handlers import admin_import, service, start
+from app.bot.handlers import admin_import, menu, questions, service, start
 from app.bot.middlewares.db_session import DbSessionMiddleware
 from app.bot.middlewares.dedup import DedupMiddleware
+from app.bot.middlewares.participant import ParticipantMiddleware
 from app.config import Settings
 
 TELEGRAM_TIMEOUT = 30  # секунд на любой запрос к Bot API
@@ -37,5 +38,18 @@ def create_dispatcher(
     dp.update.outer_middleware(DedupMiddleware(redis, bot.id))
     dp.update.outer_middleware(DbSessionMiddleware(sessionmaker))
 
-    dp.include_routers(errors.router, service.router, admin_import.router, start.router)
+    participant_mw = ParticipantMiddleware()
+    dp.message.outer_middleware(participant_mw)
+    dp.callback_query.outer_middleware(participant_mw)
+
+    dp.include_routers(
+        errors.router,
+        service.router,
+        admin_import.router,
+        questions.admin_router,
+        start.router,
+        questions.router,  # раньше меню: состояние «пишу вопрос» важнее кнопок
+        menu.router,
+        menu.fallback_router,  # последним: всё, что не поймали остальные
+    )
     return dp

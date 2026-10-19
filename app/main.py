@@ -59,6 +59,7 @@ async def _lifecycle(app: web.Application):
         settings.bot_username = me.username or ""
     log.info("bot_started", bot=me.username, test_mode=settings.test_mode)
     await _check_admin_chat(bot, settings)
+    await _set_commands(bot)
 
     polling_task: asyncio.Task | None = None
     if settings.webhook_url:
@@ -91,6 +92,25 @@ async def _lifecycle(app: web.Application):
     await app[REDIS].aclose()
     await app[ENGINE].dispose()
     log.info("bot_stopped")
+
+
+async def _set_commands(bot: Bot) -> None:
+    """Подсказки команд в меню Telegram для участников (ru по умолчанию, en для англоязычных)."""
+    from aiogram.types import BotCommand, BotCommandScopeAllPrivateChats
+
+    from app.i18n import t
+
+    scope = BotCommandScopeAllPrivateChats()
+    for lang, code in (("ru", None), ("en", "en")):
+        commands = [
+            BotCommand(command="start", description=t("commands.start", lang)),
+            BotCommand(command="menu", description=t("commands.menu", lang)),
+            BotCommand(command="status", description=t("commands.status", lang)),
+        ]
+        try:
+            await bot.set_my_commands(commands, scope=scope, language_code=code)
+        except Exception as exc:
+            log.warning("set_commands_failed", error=repr(exc))
 
 
 async def _check_admin_chat(bot: Bot, settings: Settings) -> None:

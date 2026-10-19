@@ -7,7 +7,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 from sqlalchemy import text
 
-from app.bot.setup import create_dispatcher
+from tests.harness import make_dispatcher as create_dispatcher
 from app.config import Settings
 from app.db.session import create_sessionmaker
 from app.web.health import health

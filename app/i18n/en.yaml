@@ -1,0 +1,5 @@
+start:
+  hello: "Hi! This is the Business Cup 2.0 participant bot. Registration, news and check-in are coming soon."
+
+errors:
+  generic: "Something went wrong 😔 We're already on it. Please try again a bit later."

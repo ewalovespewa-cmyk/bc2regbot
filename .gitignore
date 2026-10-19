@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+.env.*
+!.env.example
+.pgdata/
+*.egg-info/
+build/
+dist/
+# ключ сервис-аккаунта Google никогда не коммитим
+*service-account*.json
+credentials*.json
+.railway/node_modules/
+exports/

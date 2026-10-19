@@ -40,11 +40,31 @@ async def poll_reminders(ctx: JobContext) -> None:
         await session.commit()
 
 
+async def outbox(ctx: JobContext) -> None:
+    import aiohttp
+
+    from app.services.notify import notify_admins
+    from app.services.outbox_delivery import deliver_pending
+
+    async with aiohttp.ClientSession() as http:
+        delivered, dead = await deliver_pending(ctx.sessionmaker, ctx.settings, http)
+    if delivered:
+        log.info("outbox_delivered", count=delivered)
+    for event in dead:
+        await notify_admins(
+            ctx.bot, ctx.settings,
+            f"⚠️ Событие {event.type} для бота игр не доставлено за сутки (попыток: {event.attempts}). "
+            f"Последняя ошибка: {event.last_error}",
+            redis=ctx.redis, throttle_key="outbox_dead", throttle_seconds=3600,
+        )
+
+
 def all_jobs() -> list[Job]:
     sheets = lambda minutes: (lambda ctx: minutes(ctx) * 60 if ctx.settings.sheets_enabled else 0)  # noqa: E731
     jobs = [
         Job("broadcasts", broadcasts, lambda ctx: 2, timeout=120),
         Job("poll_reminders", poll_reminders, lambda ctx: 60),
+        Job("outbox", outbox, lambda ctx: 5 if ctx.settings.gamification_webhook_url else 0, timeout=120),
         Job("auto_import", auto_import, sheets(lambda ctx: ctx.settings.auto_import_minutes)),
         Job("sheet_status_sync", sheet_status_sync, sheets(lambda ctx: ctx.settings.sheet_sync_minutes)),
     ]

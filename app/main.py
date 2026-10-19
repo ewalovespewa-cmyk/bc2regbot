@@ -16,7 +16,7 @@ from app.config import Settings, get_settings
 from app.db.session import create_engine, create_sessionmaker
 from app.logs import get_logger, setup_logging
 from app.redis import create_redis
-from app.web import pages
+from app.web import api, pages
 from app.web.health import health
 from app.web.keys import BOT, DISPATCHER, ENGINE, REDIS, SESSIONMAKER, SETTINGS
 from app.workers.jobs import all_jobs
@@ -42,6 +42,7 @@ def build_app(settings: Settings) -> web.Application:
 
     app.router.add_get("/health", health)
     pages.register(app)
+    api.register(app)
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,

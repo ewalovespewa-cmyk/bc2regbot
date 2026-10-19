@@ -130,7 +130,9 @@ class Scheduler:
             await self.ctx.redis.set(key, str(time.time()))
             started = time.monotonic()
             await asyncio.wait_for(job.run(self.ctx), job.timeout)
-            log.info("job_done", job=job.name, seconds=round(time.monotonic() - started, 2))
+            seconds = round(time.monotonic() - started, 2)
+            # Частые пустые проходы (рассылки раз в 2 с) не засоряют лог; долгие — видно.
+            (log.info if seconds >= 1 else log.debug)("job_done", job=job.name, seconds=seconds)
         except asyncio.CancelledError:
             raise
         except Exception as exc:

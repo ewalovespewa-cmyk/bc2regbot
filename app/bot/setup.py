@@ -7,7 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bot import errors
-from app.bot.handlers import service, start
+from app.bot.handlers import admin_import, service, start
 from app.bot.middlewares.db_session import DbSessionMiddleware
 from app.bot.middlewares.dedup import DedupMiddleware
 from app.config import Settings
@@ -37,5 +37,5 @@ def create_dispatcher(
     dp.update.outer_middleware(DedupMiddleware(redis, bot.id))
     dp.update.outer_middleware(DbSessionMiddleware(sessionmaker))
 
-    dp.include_routers(errors.router, service.router, start.router)
+    dp.include_routers(errors.router, service.router, admin_import.router, start.router)
     return dp

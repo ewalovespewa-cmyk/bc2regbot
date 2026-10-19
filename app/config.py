@@ -51,6 +51,33 @@ class Settings(BaseSettings):
     games_bot_username: str = ""
     games_chat_link: str = ""
 
+    # Google Sheets (этап 2). Пока SHEET_ID пуст, импорт идёт из CSV, выгрузка — в CSV.
+    sheet_id: str = ""
+    # Содержимое JSON-ключа сервис-аккаунта целиком (или base64 от него).
+    google_service_account_json: str = ""
+    sheet_applications_worksheet: str = ""  # пусто → первый лист
+    sheet_status_worksheet: str = "bot_status"
+    sheet_teams_worksheet: str = ""  # лист "team_name, email"; пусто → не читаем
+    # Поле участника → название колонки в таблице. Незаданные поля берутся из DEFAULT_COLUMN_MAP.
+    sheet_column_map: dict[str, str] = {}
+    sheet_selected_column: str = "Selected"
+    sheet_selected_values: Annotated[frozenset[str], NoDecode] = frozenset({"yes", "да", "1", "true", "+", "✅"})
+    sheet_team_column: str = "Team"
+    sheet_sync_minutes: int = 10
+    auto_import_minutes: int = 30
+    sheets_timeout_seconds: int = 30
+
+    @field_validator("sheet_selected_values", mode="before")
+    @classmethod
+    def _parse_values(cls, value: object) -> object:
+        if isinstance(value, str):
+            return frozenset(x.strip().lower() for x in value.split(",") if x.strip())
+        return value
+
+    @property
+    def sheets_enabled(self) -> bool:
+        return bool(self.sheet_id and self.google_service_account_json)
+
     @field_validator("superadmin_ids", mode="before")
     @classmethod
     def _parse_ids(cls, value: object) -> object:

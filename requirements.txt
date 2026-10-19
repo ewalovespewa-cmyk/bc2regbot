@@ -35,6 +35,7 @@ PyYAML==6.0.3
 redis==6.4.0
 requests==2.34.2
 requests-oauthlib==2.0.0
+tzdata==2026.5
 segno==1.6.6
 SQLAlchemy==2.0.55
 structlog==26.1.0

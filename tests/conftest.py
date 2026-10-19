@@ -13,6 +13,8 @@ from pathlib import Path
 import pytest
 from fakeredis import FakeAsyncRedis
 
+import app.db.models  # noqa: F401  все таблицы в metadata
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # Settings требуют обязательные переменные; в тестах подставляем безопасные значения.
@@ -43,6 +45,31 @@ def pg_url() -> str:
         capture_output=True,
     )
     return url
+
+
+@pytest.fixture(scope="session")
+async def engine(pg_url):
+    from app.config import normalize_db_url
+    from app.db.session import create_engine
+
+    eng = create_engine(normalize_db_url(pg_url))
+    yield eng
+    await eng.dispose()
+
+
+@pytest.fixture
+async def session(engine):
+    """Сессия на чистой БД: перед каждым тестом все таблицы очищаются."""
+    from sqlalchemy import text
+
+    from app.db.base import Base
+    from app.db.session import create_sessionmaker
+
+    tables = ", ".join(t.name for t in Base.metadata.sorted_tables)
+    async with engine.begin() as conn:
+        await conn.execute(text(f"TRUNCATE {tables} RESTART IDENTITY CASCADE"))
+    async with create_sessionmaker(engine)() as s:
+        yield s
 
 
 @pytest.fixture

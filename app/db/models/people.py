@@ -59,7 +59,8 @@ class Participant(Base):
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()
 
-    team: Mapped[Team | None] = relationship(back_populates="members")
+    # selectin: команда нужна почти везде, где нужен участник (статус, карточка, выгрузки).
+    team: Mapped[Team | None] = relationship(back_populates="members", lazy="selectin")
 
 
 class Admin(Base):

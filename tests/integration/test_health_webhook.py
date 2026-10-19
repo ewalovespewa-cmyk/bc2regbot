@@ -1,7 +1,6 @@
 """/health против настоящего Postgres и проверка секрета webhook."""
 from unittest.mock import AsyncMock
 
-import pytest
 from aiogram import Bot
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
@@ -10,16 +9,9 @@ from sqlalchemy import text
 
 from app.bot.setup import create_dispatcher
 from app.config import Settings
-from app.db.session import create_engine, create_sessionmaker
+from app.db.session import create_sessionmaker
 from app.web.health import health
 from app.web.keys import ENGINE, REDIS
-
-
-@pytest.fixture
-async def engine(pg_url):
-    eng = create_engine(Settings(_env_file=None, database_url=pg_url).database_url)
-    yield eng
-    await eng.dispose()
 
 
 async def _client(app: web.Application) -> TestClient:

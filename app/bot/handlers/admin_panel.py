@@ -40,7 +40,8 @@ def admin_menu_keyboard(role: Role) -> InlineKeyboardMarkup:
     rows = [[_btn("🔎 Найти участника", "adm:find")]]
     if has_role(role, Role.ADMIN):
         rows.append([_btn("📤 Выгрузка CSV", "adm:export"), _btn("🔄 В Google Sheet", "adm:sync")])
-        rows.append([_btn("📝 Контент", "adm:content")])
+        rows.append([_btn("📣 Рассылка", "adm:broadcast"), _btn("📋 Опрос явки", "adm:poll")])
+        rows.append([_btn("📝 Контент", "adm:content"), _btn("📞 Обзвон", "adm:calls")])
     if has_role(role, Role.SUPERADMIN):
         rows.append([_btn("📥 Импорт", "adm:import"), _btn("👥 Админы", "adm:admins")])
         rows.append([_btn("🧾 Журнал действий", "adm:audit")])
@@ -77,7 +78,10 @@ async def on_import_button(callback: CallbackQuery, settings: Settings) -> None:
     await callback.answer()
 
 
-@router.callback_query(F.data.in_({"adm:export", "adm:sync", "adm:content", "adm:admins", "adm:audit"}))
+@router.callback_query(
+    F.data.in_({"adm:export", "adm:sync", "adm:content", "adm:admins", "adm:audit", "adm:broadcast", "adm:poll",
+                "adm:calls", "adm:stats", "adm:checkin"})
+)
 async def on_shortcut(callback: CallbackQuery) -> None:
     """Кнопки-ярлыки: подсказываем команду, сами команды проверяют роль."""
     command = callback.data.split(":")[1]
@@ -211,8 +215,8 @@ async def on_find_query(message: Message, state: FSMContext, session: AsyncSessi
 
 
 def card_keyboard(p: Participant, role: Role) -> InlineKeyboardMarkup | None:
-    rows = []
-    # Этап 7 добавит сюда «✅ Отметить сегодня», этап 6 — «📞 Результат обзвона».
+    rows = [[_btn("📞 Результат обзвона", f"pc:ask:{p.id}")]]
+    # Этап 7 добавляет «✅ Отметить сегодня» (см. checkin_card_rows).
     if has_role(role, Role.SUPERADMIN) and p.telegram_user_id:
         rows.append([_btn("🔓 Отвязать Telegram", f"p:unlink:{p.id}")])
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None

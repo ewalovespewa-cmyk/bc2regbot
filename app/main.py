@@ -18,7 +18,7 @@ from app.logs import get_logger, setup_logging
 from app.redis import create_redis
 from app.web.health import health
 from app.web.keys import BOT, DISPATCHER, ENGINE, REDIS, SESSIONMAKER, SETTINGS
-from app.workers.jobs import stage2_jobs
+from app.workers.jobs import all_jobs
 from app.workers.runner import JobContext, Scheduler
 
 log = get_logger(__name__)
@@ -78,7 +78,7 @@ async def _lifecycle(app: web.Application):
             dp.start_polling(bot, handle_signals=False, allowed_updates=dp.resolve_used_update_types())
         )
 
-    scheduler = Scheduler(JobContext(bot, app[REDIS], app[SESSIONMAKER], settings), stage2_jobs())
+    scheduler = Scheduler(JobContext(bot, app[REDIS], app[SESSIONMAKER], settings), all_jobs())
     scheduler.start()
 
     yield

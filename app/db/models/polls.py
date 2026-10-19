@@ -38,10 +38,13 @@ class Poll(Base):
     reminder_after_hours: Mapped[int | None] = mapped_column(Integer)
     max_reminders: Mapped[int] = mapped_column(Integer, server_default="0")
     is_active: Mapped[bool] = mapped_column(Boolean, server_default=false())
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reminders_sent: Mapped[int] = mapped_column(Integer, server_default="0")
+    last_reminder_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[int | None] = mapped_column(BigInteger)
     created_at: Mapped[datetime] = created_at_col()
 
-    options: Mapped[list["PollOption"]] = relationship(order_by="PollOption.position")
+    options: Mapped[list["PollOption"]] = relationship(order_by="PollOption.position", lazy="selectin")
 
 
 class PollOption(Base):

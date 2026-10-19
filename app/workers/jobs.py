@@ -1,5 +1,6 @@
-"""Периодические задачи этапа 2: автоимпорт из Google Sheet и обратная запись bot_status."""
+"""Периодические задачи: рассылки, напоминания опросов, автоимпорт и bot_status в Google Sheet."""
 from app.logs import get_logger
+from app.services import broadcast, polls
 from app.services.settings_store import AUTO_IMPORT_ENABLED, get_setting
 from app.services.sheet_sync import import_from_sheet, push_status_to_sheet
 from app.workers.runner import Job, JobContext
@@ -27,16 +28,24 @@ async def auto_import(ctx: JobContext) -> None:
         )
 
 
-def stage2_jobs() -> list[Job]:
-    return [
-        Job(
-            "auto_import",
-            auto_import,
-            lambda ctx: ctx.settings.auto_import_minutes * 60 if ctx.settings.sheets_enabled else 0,
-        ),
-        Job(
-            "sheet_status_sync",
-            sheet_status_sync,
-            lambda ctx: ctx.settings.sheet_sync_minutes * 60 if ctx.settings.sheets_enabled else 0,
-        ),
+async def broadcasts(ctx: JobContext) -> None:
+    await broadcast.run_worker_cycle(ctx.bot, ctx.sessionmaker, ctx.settings, time_budget=50)
+
+
+async def poll_reminders(ctx: JobContext) -> None:
+    async with ctx.sessionmaker() as session:
+        for poll in await polls.due_reminders(session):
+            b = await polls.send_reminder(session, poll, ctx.settings)
+            log.info("poll_reminder", poll_id=poll.id, broadcast_id=b.id if b else None)
+        await session.commit()
+
+
+def all_jobs() -> list[Job]:
+    sheets = lambda minutes: (lambda ctx: minutes(ctx) * 60 if ctx.settings.sheets_enabled else 0)  # noqa: E731
+    jobs = [
+        Job("broadcasts", broadcasts, lambda ctx: 2, timeout=120),
+        Job("poll_reminders", poll_reminders, lambda ctx: 60),
+        Job("auto_import", auto_import, sheets(lambda ctx: ctx.settings.auto_import_minutes)),
+        Job("sheet_status_sync", sheet_status_sync, sheets(lambda ctx: ctx.settings.sheet_sync_minutes)),
     ]
+    return jobs

@@ -22,7 +22,7 @@ log = get_logger(__name__)
 
 LOCK_KEY = "workers:leader"
 LOCK_TTL = 45
-TICK_SECONDS = 15
+TICK_SECONDS = 2  # интервалы задач задаются отдельно; тик только проверяет, не пора ли
 
 _RENEW = """
 if redis.call('get', KEYS[1]) == ARGV[1] then

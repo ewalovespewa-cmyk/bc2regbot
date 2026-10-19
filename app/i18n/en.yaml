@@ -79,6 +79,15 @@ question:
   no_admin_chat: "Questions aren't accepted right now. Contact the organizers directly: {contact}"
   answer: "💬 <b>Reply from the organizers</b>\n\n{answer}"
 
+poll:
+  not_participant: "This poll is for participants only. Tap /start to link your account."
+  closed: "The poll is closed — answers are no longer accepted."
+  saved: "Saved: {answer}. You can change it until the deadline."
+  ask_reason: "Sorry to hear that 😔 Could you tell us why? It helps us. Write one message or skip."
+  skip: "Skip"
+  reason_thanks: "Thank you, noted 🙏"
+  reason_skipped: "OK, no reason."
+
 commands:
   start: "Start / link your account"
   menu: "Show the menu"

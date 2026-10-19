@@ -9,8 +9,8 @@ import { defineRailway, github, postgres, preserve, project, redis, service } fr
 export const partial = "bc2regbot";
 
 export default defineRailway(() => {
-  const db = postgres("bc-postgres");
-  const cache = redis("bc-redis");
+  const db = postgres("Postgres");
+  const cache = redis("Redis");
 
   const bot = service("bc2regbot", {
     source: github("ewalovespewa-cmyk/bc2regbot", { branch: "main" }),

@@ -59,7 +59,8 @@ async def checkin_screen_state(request: web.Request) -> web.Response:
         body |= {
             "state": "open",
             "seconds_left": seconds_left,
-            "svg": segno.make(link, error="m").svg_inline(scale=12, border=2, dark="#111111", light="#ffffff"),
+            # omitsize: без width/height и с viewBox — SVG тянется на всю карточку, а не висит в углу.
+            "svg": segno.make(link, error="m").svg_inline(border=2, dark="#0b0a12", light="#ffffff", omitsize=True),
         }
     return web.json_response(body, headers=NO_CACHE)
 

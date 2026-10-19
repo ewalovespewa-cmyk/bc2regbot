@@ -4,59 +4,168 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Business Cup 2.0 · Чекин</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Silkscreen&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #0d0f14; --fg: #f4f5f7; --muted: #9aa1ad; --accent: #4ade80; --card: #ffffff; }
+  /* Стиль сайта businesscup.zimran.io: фиолетовый градиент, пиксельная сетка, лаймовый акцент, острые углы. */
+  :root {
+    --violet: #5b42dc;
+    --violet-2: #7367ff;
+    --ink: #0b0a12;
+    --lime: #baff3b;
+    --white: #ffffff;
+    --muted: #c3bdd3;
+    --line: rgba(255, 255, 255, 0.55);
+    --pixel: "Silkscreen", "JetBrains Mono", monospace;
+    --sans: "Inter", Arial, sans-serif;
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
-    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  main { min-height: 100%; display: grid; grid-template-rows: auto 1fr auto; align-items: center;
-    justify-items: center; padding: 3vh 4vw; gap: 2vh; text-align: center; }
-  h1 { margin: 0; font-size: clamp(28px, 4.5vw, 64px); letter-spacing: -0.02em; }
-  .day { color: var(--muted); font-size: clamp(18px, 2.2vw, 32px); margin-top: .4em; }
-  .qr { background: var(--card); padding: 2vh; border-radius: 24px; line-height: 0; }
-  .qr svg { width: min(62vh, 80vw); height: auto; display: block; }
-  .hint { font-size: clamp(18px, 2.4vw, 34px); margin-top: 1.5vh; }
-  .timer { color: var(--muted); font-size: clamp(14px, 1.6vw, 22px); margin-top: .6vh; font-variant-numeric: tabular-nums; }
-  .bar { height: 6px; width: min(62vh, 80vw); background: #262a33; border-radius: 3px; overflow: hidden; margin: 1vh auto 0; }
-  .bar > div { height: 100%; background: var(--accent); transition: width 1s linear; }
-  .counter { font-size: clamp(22px, 3vw, 44px); font-variant-numeric: tabular-nums; }
-  .counter b { color: var(--accent); }
-  .closed { font-size: clamp(28px, 4vw, 56px); color: var(--muted); }
-  .error { color: #f87171; font-size: 14px; min-height: 1em; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    color: var(--white);
+    font-family: var(--sans);
+    background-color: var(--ink);
+    background-image:
+      linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+      radial-gradient(120% 90% at 0% 0%, var(--violet) 0%, #2a1f6e 42%, var(--ink) 78%);
+    background-size: 48px 48px, 48px 48px, 100% 100%;
+    overflow: hidden;
+  }
+
+  .stage {
+    height: 100vh;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: 1fr auto;
+    gap: 0 5vw;
+    padding: 5vh 5vw 0;
+  }
+
+  /* --- левая колонка: бренд, день, инструкция, счётчик --- */
+  .info { display: flex; flex-direction: column; justify-content: center; gap: 3.2vh; min-width: 0; }
+  .kicker { font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted);
+    font-size: clamp(14px, 1.5vw, 26px); }
+  .title { display: flex; align-items: center; gap: .35em; flex-wrap: wrap; margin: 0;
+    font-weight: 900; text-transform: uppercase; line-height: .95; letter-spacing: -.01em;
+    font-size: clamp(40px, 4.6vw, 110px); }
+  .title .ver { font-family: var(--pixel); font-weight: 400; font-size: .36em; letter-spacing: .04em; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 12px; }
+  .chip { border: 1px solid var(--line); padding: .6em 1.1em; text-transform: uppercase; font-weight: 600;
+    font-size: clamp(13px, 1.15vw, 20px); letter-spacing: .03em; display: inline-flex; gap: .55em; align-items: center; }
+  .chip.day { background: var(--lime); color: var(--ink); border-color: var(--lime); font-weight: 800; }
+
+  .scan { font-weight: 800; text-transform: uppercase; line-height: 1.05; font-size: clamp(24px, 3vw, 56px); margin: 0; }
+  .scan .lime { color: var(--lime); }
+  .hint { color: var(--muted); font-size: clamp(14px, 1.3vw, 22px); max-width: 34em; line-height: 1.4; margin: 0; }
+
+  .counter { display: flex; align-items: baseline; gap: .4em; font-variant-numeric: tabular-nums; }
+  .counter .num { color: var(--lime); font-weight: 900; font-size: clamp(56px, 7vw, 140px); line-height: .9; letter-spacing: -.02em; }
+  .counter .of { font-weight: 800; font-size: clamp(22px, 2.4vw, 44px); color: var(--white); }
+  .counter .label { display: block; color: var(--muted); text-transform: uppercase; font-weight: 600;
+    letter-spacing: .05em; font-size: clamp(12px, 1vw, 18px); }
+
+  /* --- правая колонка: QR --- */
+  .qr-col { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2vh; }
+  .qr { position: relative; background: var(--white); padding: 1.6vh;
+    width: min(74vh, 46vw); aspect-ratio: 1; box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(0,0,0,.45); }
+  .qr svg { display: block; width: 100%; height: 100%; shape-rendering: crispEdges; }
+  /* лаймовые «прицельные» уголки, как пиксельные рамки на сайте */
+  .qr::before, .qr::after, .qr > .c1, .qr > .c2 { content: ""; position: absolute; width: 9%; height: 9%; border: 6px solid var(--lime); }
+  .qr::before { top: -14px; left: -14px; border-right: 0; border-bottom: 0; }
+  .qr::after { bottom: -14px; right: -14px; border-left: 0; border-top: 0; }
+  .qr > .c1 { top: -14px; right: -14px; border-left: 0; border-bottom: 0; }
+  .qr > .c2 { bottom: -14px; left: -14px; border-right: 0; border-top: 0; }
+
+  .timer { width: min(74vh, 46vw); }
+  .bar { height: 8px; background: rgba(255,255,255,.15); overflow: hidden; }
+  .bar > div { height: 100%; background: var(--lime); transition: width 1s linear; }
+  .timer .t { margin-top: 1vh; color: var(--muted); font-size: clamp(12px, 1vw, 18px); text-transform: uppercase;
+    letter-spacing: .05em; font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
+
+  .closed { width: min(74vh, 46vw); aspect-ratio: 1; display: grid; place-items: center; text-align: center;
+    border: 1px solid var(--line); padding: 4vh; background: rgba(11,10,18,.35); }
+  /* Silkscreen без кириллицы — русские заголовки набираем жирным Inter, как заголовки сайта. */
+  .closed b { display: block; font-weight: 900; text-transform: uppercase; font-size: clamp(24px, 2.8vw, 52px); color: var(--lime); }
+  .closed span { display: block; margin-top: 2vh; color: var(--muted); font-size: clamp(14px, 1.3vw, 22px); }
+
+  /* --- бегущая строка снизу, как на сайте --- */
+  .ticker { grid-column: 1 / -1; margin: 3vh -5vw 0; background: var(--ink); border-top: 1px solid rgba(255,255,255,.15);
+    overflow: hidden; white-space: nowrap; font-family: var(--pixel); font-size: clamp(16px, 1.8vw, 32px);
+    padding: 1.6vh 0; }
+  .ticker span { display: inline-block; padding-left: 100%; animation: run 38s linear infinite; }
+  @keyframes run { to { transform: translateX(-100%); } }
+
+  .error { position: fixed; top: 12px; right: 16px; color: #ff8a8a; font-size: 14px; }
+
+  /* портрет и узкие экраны — одна колонка */
+  @media (max-aspect-ratio: 1/1) {
+    body { overflow-x: hidden; overflow-y: auto; }
+    .stage { grid-template-columns: 1fr; height: auto; min-height: 100vh; padding: 4vh 16px 0; gap: 4vh; }
+    .info { text-align: center; align-items: center; }
+    .title { justify-content: center; }
+    .chips { justify-content: center; }
+    .qr, .timer, .closed { width: min(86vw, 60vh); }
+    .ticker { margin: 3vh -16px 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { .ticker span { animation: none; padding-left: 0; } }
 </style>
 </head>
 <body>
-<main>
-  <header>
-    <h1>Business Cup 2.0</h1>
-    <div class="day" id="day">&nbsp;</div>
-  </header>
-  <section id="content"><div class="closed">Загрузка…</div></section>
-  <footer>
-    <div class="counter" id="counter">&nbsp;</div>
-    <div class="error" id="error"></div>
-  </footer>
+<main class="stage">
+  <section class="info">
+    <div class="kicker">From zero to product in 24 hours</div>
+    <h1 class="title">Business Cup <span class="ver">&lt;/2.0&gt;</span></h1>
+    <div class="chips">
+      <span class="chip day" id="day">Чекин</span>
+      <span class="chip">📅 14–15 ноября</span>
+      <span class="chip">📍 Nazarbayev University</span>
+    </div>
+    <div>
+      <p class="scan">Наведи камеру —<br><span class="lime">Telegram отметит тебя</span></p>
+    </div>
+    <p class="hint">Открой камеру телефона или кнопку «✅ Отметиться» в боте участника. Код меняется каждые 30 секунд — фото экрана не сработает.</p>
+    <div class="counter">
+      <div>
+        <span class="label">Уже на месте</span>
+        <span class="num" id="checked">0</span><span class="of" id="total">/ 0</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="qr-col" id="content">
+    <div class="closed"><div><b>Загрузка…</b></div></div>
+  </section>
+
+  <div class="ticker" aria-hidden="true"><span>BUSINESS CUP 2.0 × ZIMRAN × AIESEC × NAZARBAYEV UNIVERSITY × FROM ZERO TO PRODUCT IN 24 HOURS × BUSINESS CUP 2.0 × ZIMRAN × AIESEC × NAZARBAYEV UNIVERSITY ×</span></div>
 </main>
+<div class="error" id="error"></div>
 <script>
   const key = new URLSearchParams(location.search).get("key") || "";
   const el = (id) => document.getElementById(id);
   let secondsLeft = 0, lastSvg = "";
 
   function render(s) {
-    el("day").textContent = s.day ? s.day : "";
-    el("counter").innerHTML = `Отмечено <b>${s.checked}</b> из ${s.total}`;
+    el("day").textContent = s.day ? s.day : "Чекин";
+    el("checked").textContent = s.checked;
+    el("total").textContent = `/ ${s.total}`;
     if (s.state !== "open") {
-      const text = { closed: "Чекин сейчас закрыт", screen_off: "Экран выключен",
-                     misconfigured: "Не настроен CHECKIN_SECRET или имя бота" }[s.state] || "Чекин закрыт";
-      el("content").innerHTML = `<div class="closed">${text}</div>`;
+      const [title, sub] = {
+        closed: ["Чекин закрыт", "Откроется в начале дня — подходи к волонтёрам у входа"],
+        screen_off: ["Экран на паузе", "Отметиться можно у волонтёров"],
+        misconfigured: ["Нет настроек", "Нужны CHECKIN_SECRET и имя бота"],
+      }[s.state] || ["Чекин закрыт", ""];
+      el("content").innerHTML = `<div class="closed"><div><b>${title}</b><span>${sub}</span></div></div>`;
       lastSvg = "";
       return;
     }
     secondsLeft = s.seconds_left;
     if (s.svg !== lastSvg) {
-      el("content").innerHTML = `<div class="qr">${s.svg}</div>
-        <div class="hint">📱 Наведи камеру телефона на QR — Telegram отметит тебя</div>
-        <div class="bar"><div id="bar"></div></div><div class="timer" id="timer"></div>`;
+      el("content").innerHTML = `<div class="qr"><i class="c1"></i><i class="c2"></i>${s.svg}</div>
+        <div class="timer"><div class="bar"><div id="bar"></div></div>
+        <div class="t"><span>Новый код через</span><span id="timer"></span></div></div>`;
       lastSvg = s.svg;
     }
     tick();
@@ -65,8 +174,9 @@
   function tick() {
     const timer = el("timer"), bar = el("bar");
     if (!timer) return;
-    timer.textContent = `Код обновится через ${secondsLeft} с`;
-    bar.style.width = `${Math.max(0, secondsLeft) / 30 * 100}%`;
+    const left = Math.max(0, secondsLeft);
+    timer.textContent = `${left} с`;
+    bar.style.width = `${left / 30 * 100}%`;
   }
 
   async function poll() {

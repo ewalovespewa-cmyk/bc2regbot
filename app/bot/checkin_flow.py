@@ -89,8 +89,8 @@ async def handle_code(
     lang: str,
 ) -> None:
     if participant is None:
-        # Не привязан: проверяем код сейчас, запоминаем чекин и ведём на привязку.
-        from app.bot.handlers.start import ask_contact
+        # Не привязан: проверяем код сейчас, запоминаем чекин и привязываем (по username или контакту).
+        from app.bot.handlers.start import link_or_ask_contact
 
         day = await today_day(session, settings)
         if not is_open(day):
@@ -100,9 +100,10 @@ async def handle_code(
             if not await _too_many_invalid(message, session, bot, redis, settings, lang):
                 await message.answer(t("checkin.expired", lang))
             return
-        await ask_contact(message, state, lang)
         await state.update_data(pending_checkin={"day_id": day.id, "at": time.time()})
-        await message.answer(t("checkin.need_link", lang))
+        await link_or_ask_contact(message, state=state, session=session, bot=bot, redis=redis, settings=settings, lang=lang)
+        if await state.get_state() is not None:  # username не совпал — ждём контакт
+            await message.answer(t("checkin.need_link", lang))
         return
 
     result = await self_checkin(session, participant, code or "", settings)

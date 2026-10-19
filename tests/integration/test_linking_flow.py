@@ -193,3 +193,26 @@ async def test_duplicate_update_processed_once(h, session):
     await h.text(ARU, "/start ARUtoken0001", update_id=777)
     await h.text(ARU, "/start ARUtoken0001", update_id=777)
     assert len(h.session.sent(ARU)) == 2  # приветствие + кнопка игр, только один раз
+
+
+async def test_start_links_silently_by_telegram_username(h, session):
+    await h.text(ARU, "/start", username="Aru_B")  # username в Telegram совпал с формой
+    assert (await participant(session, "aru@mail.com")).telegram_user_id == ARU
+    assert "Aru" in h.session.texts(ARU)[0]
+    assert all(
+        not (getattr(c.reply_markup, "keyboard", None) and c.reply_markup.keyboard[0][0].request_contact)
+        for c in h.session.sent(ARU)
+    )  # номер не спрашивали
+
+
+async def test_username_mismatch_still_asks_contact(h, session):
+    await h.text(DANA, "/start", username="someone_else")
+    assert h.session.sent(DANA)[-1].reply_markup.keyboard[0][0].request_contact is True
+    assert (await participant(session, "dana@mail.com")).telegram_user_id is None
+
+
+async def test_ambiguous_username_asks_contact(h, session):
+    session.add(Participant(email="dup@mail.com", full_name="Dup", invite_token="DUPtoken0001", tg_username_form="aru_b"))
+    await session.commit()
+    await h.text(ARU, "/start", username="aru_b")
+    assert h.session.sent(ARU)[-1].reply_markup.keyboard[0][0].request_contact is True

@@ -188,3 +188,13 @@ async def test_screen_and_dashboard_endpoints(engine, world, settings, session):
         assert (await client.get("/webapp/scan")).status == 200
     finally:
         await client.close()
+
+
+async def test_qr_scan_unlinked_with_matching_username_checks_in_at_once(h, session, world):
+    p = await session.scalar(select(Participant).where(Participant.email == "new@x.kz"))
+    p.tg_username_form = "new_person"
+    await session.commit()
+    await h.text(NEW, f"/start ci_{code_for(world.id)}", username="New_Person")
+    texts = h.session.texts(NEW)
+    assert any("Ты отмечен" in t for t in texts)
+    assert not any("Сначала привяжем" in t for t in texts)  # без контакта

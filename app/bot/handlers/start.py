@@ -16,7 +16,14 @@ from app.i18n import t
 from app.bot.checkin_flow import call_organizer_keyboard, finish_pending, handle_code
 from app.services import checkin_codes, ratelimit, security
 from app.services.importer import team_display_name
-from app.services.linking import LinkResult, LinkStatus, TelegramUser, link_by_contact, link_by_token
+from app.services.linking import (
+    LinkResult,
+    LinkStatus,
+    TelegramUser,
+    link_by_contact,
+    link_by_token,
+    link_by_username,
+)
 from app.services.normalize import normalize_phone
 from app.services.tokens import is_invite_token
 
@@ -51,6 +58,26 @@ async def send_welcome(message: Message, participant: Participant, settings: Set
 async def ask_contact(message: Message, state: FSMContext, lang: str) -> None:
     await state.set_state(LinkStates.waiting_contact)
     await message.answer(t("start.ask_contact", lang), reply_markup=contact_keyboard(lang))
+
+
+async def link_or_ask_contact(
+    message: Message,
+    *,
+    state: FSMContext,
+    session: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    settings: Settings,
+    lang: str,
+) -> None:
+    """Сначала тихо сверяем Telegram username с заявкой; номер просим, только если не совпало."""
+    result = await link_by_username(session, _tg_user(message.from_user))
+    if result.ok:
+        await _handle_result(
+            message, result, via="username", lang=lang, state=state, session=session, bot=bot, redis=redis, settings=settings
+        )
+        return
+    await ask_contact(message, state, lang)
 
 
 async def _handle_result(
@@ -156,18 +183,25 @@ async def start_with_payload(
             last_payload=payload[:64],
         )
         return
-    await ask_contact(message, state, lang)
+    await link_or_ask_contact(message, state=state, session=session, bot=bot, redis=redis, settings=settings, lang=lang)
 
 
 @router.message(CommandStart())
 async def start_plain(
-    message: Message, state: FSMContext, settings: Settings, participant: Participant | None, lang: str
+    message: Message,
+    state: FSMContext,
+    session: AsyncSession,
+    bot: Bot,
+    redis: Redis,
+    settings: Settings,
+    participant: Participant | None,
+    lang: str,
 ) -> None:
     if participant:
         await state.clear()
         await send_welcome(message, participant, settings, first_time=False)
         return
-    await ask_contact(message, state, lang)
+    await link_or_ask_contact(message, state=state, session=session, bot=bot, redis=redis, settings=settings, lang=lang)
 
 
 @router.message(F.contact)

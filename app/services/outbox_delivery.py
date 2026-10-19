@@ -16,7 +16,7 @@ import time
 from datetime import UTC, datetime, timedelta
 
 import aiohttp
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.config import Settings
@@ -60,7 +60,7 @@ async def deliver_pending(
         events = (
             await session.scalars(
                 select(OutboundEvent)
-                .where(OutboundEvent.status == OutboxStatus.PENDING, OutboundEvent.next_attempt_at <= now)
+                .where(OutboundEvent.status == OutboxStatus.PENDING, OutboundEvent.next_attempt_at <= func.now())
                 .order_by(OutboundEvent.id)
                 .limit(BATCH)
                 .with_for_update(skip_locked=True)

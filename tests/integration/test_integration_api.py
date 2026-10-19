@@ -110,6 +110,7 @@ async def test_outbox_delivers_signed_and_retries_when_receiver_down(engine, ses
     async with aiohttp.ClientSession() as http:
         delivered, dead = await deliver_pending(sm, settings, http)
     assert (delivered, dead, receiver.received) == (0, [], [])
+    session.expire_all()  # событие менял воркер в своей сессии
     event = await session.scalar(select(OutboundEvent))
     assert event.status == OutboxStatus.PENDING and event.attempts == 1 and event.next_attempt_at > datetime.now(UTC)
 

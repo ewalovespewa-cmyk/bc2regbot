@@ -113,6 +113,33 @@ async def link_by_token(session: AsyncSession, user: TelegramUser, token: str) -
     return await _link(session, participant, user)
 
 
+async def link_by_username(session: AsyncSession, user: TelegramUser) -> LinkResult:
+    """Тихая привязка без вопросов: username из Telegram совпал с username из заявки.
+
+    Срабатывает только в однозначном случае (ровно одна свободная заявка с таким username).
+    Во всех остальных — NOT_FOUND, и бот спокойно предлагает контакт: username в форме мог быть
+    с опечаткой или чужим, поэтому алертов здесь не шлём.
+    """
+    if not user.username:
+        return LinkResult(LinkStatus.NOT_FOUND)
+    candidates = (
+        await session.scalars(
+            select(Participant)
+            .where(Participant.tg_username_form == user.username.lower(), Participant.is_selected)
+            .with_for_update()
+        )
+    ).all()
+    mine = [p for p in candidates if p.telegram_user_id == user.id]
+    if mine:
+        return await _link(session, mine[0], user)
+    free = [p for p in candidates if p.telegram_user_id is None]
+    if len(free) != 1:
+        return LinkResult(LinkStatus.NOT_FOUND)
+    if await session.scalar(select(Participant.id).where(Participant.telegram_user_id == user.id)):
+        return LinkResult(LinkStatus.NOT_FOUND)  # аккаунт уже привязан к другой заявке — пусть решают люди
+    return await _link(session, free[0], user)
+
+
 async def link_by_contact(
     session: AsyncSession, user: TelegramUser, phone: str | None
 ) -> LinkResult:

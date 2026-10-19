@@ -87,6 +87,23 @@ async def _link(session: AsyncSession, participant: Participant, user: TelegramU
     return LinkResult(LinkStatus.LINKED, participant)
 
 
+async def unlink(session: AsyncSession, participant: Participant) -> int | None:
+    """Отвязывает Telegram (поддержка: человек привязал не тот аккаунт). Возвращает прежний Telegram ID."""
+    old_id = participant.telegram_user_id
+    if old_id is None:
+        return None
+    participant.telegram_user_id = None
+    participant.telegram_username = None
+    participant.linked_at = None
+    outbox.enqueue(
+        session,
+        outbox.PARTICIPANT_UNLINKED,
+        {"telegram_user_id": old_id, "participant_id": participant.id},
+    )
+    await session.flush()
+    return old_id
+
+
 async def link_by_token(session: AsyncSession, user: TelegramUser, token: str) -> LinkResult:
     participant = await session.scalar(
         select(Participant).where(Participant.invite_token == token).with_for_update()

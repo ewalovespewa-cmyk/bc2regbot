@@ -7,7 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bot import errors
-from app.bot.handlers import admin_import, menu, questions, service, start
+from app.bot.handlers import admin_content, admin_import, admin_panel, menu, questions, service, start
 from app.bot.middlewares.db_session import DbSessionMiddleware
 from app.bot.middlewares.dedup import DedupMiddleware
 from app.bot.middlewares.participant import ParticipantMiddleware
@@ -46,6 +46,8 @@ def create_dispatcher(
         errors.router,
         service.router,
         admin_import.router,
+        admin_panel.router,
+        admin_content.router,
         questions.admin_router,
         start.router,
         questions.router,  # раньше меню: состояние «пишу вопрос» важнее кнопок

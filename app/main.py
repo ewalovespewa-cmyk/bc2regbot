@@ -60,6 +60,7 @@ async def _lifecycle(app: web.Application):
     log.info("bot_started", bot=me.username, test_mode=settings.test_mode)
     await _check_admin_chat(bot, settings)
     await _set_commands(bot)
+    await _set_admin_commands(bot, app[SESSIONMAKER], settings)
 
     polling_task: asyncio.Task | None = None
     if settings.webhook_url:
@@ -111,6 +112,19 @@ async def _set_commands(bot: Bot) -> None:
             await bot.set_my_commands(commands, scope=scope, language_code=code)
         except Exception as exc:
             log.warning("set_commands_failed", error=repr(exc))
+
+
+async def _set_admin_commands(bot: Bot, sessionmaker, settings: Settings) -> None:
+    from app.bot.admin_commands import apply_admin_commands
+    from app.db.models import Role
+    from app.services.admins import list_admins
+
+    async with sessionmaker() as session:
+        admins = await list_admins(session)
+    for uid in settings.superadmin_ids:
+        await apply_admin_commands(bot, uid, Role.SUPERADMIN)
+    for admin in admins:
+        await apply_admin_commands(bot, admin.telegram_user_id, admin.role)
 
 
 async def _check_admin_chat(bot: Bot, settings: Settings) -> None:

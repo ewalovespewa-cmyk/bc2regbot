@@ -229,6 +229,7 @@ class _Row:
     participant_id: int | None
     name: str | None
     lang: str
+    attempts: int = 1  # с учётом текущего захвата
 
 
 async def _claim(sm: async_sessionmaker[AsyncSession], broadcast_id: int) -> list[_Row]:
@@ -241,6 +242,7 @@ async def _claim(sm: async_sessionmaker[AsyncSession], broadcast_id: int) -> lis
                 BroadcastDelivery.participant_id,
                 Participant.full_name,
                 Participant.lang,
+                BroadcastDelivery.attempts,
             )
             .outerjoin(Participant, Participant.id == BroadcastDelivery.participant_id)
             .where(
@@ -252,7 +254,7 @@ async def _claim(sm: async_sessionmaker[AsyncSession], broadcast_id: int) -> lis
             .limit(BATCH)
             .with_for_update(of=BroadcastDelivery, skip_locked=True)
         )
-        rows = [_Row(r[0], r[1], r[2], r[3], r[4] or "ru") for r in result]
+        rows = [_Row(r[0], r[1], r[2], r[3], r[4] or "ru", r[5] + 1) for r in result]
         if rows:
             await session.execute(
                 update(BroadcastDelivery)
@@ -275,14 +277,14 @@ async def _send_with_retry_after(bot: Bot, row: _Row, b: Broadcast, extra_rows) 
     raise RuntimeError("Telegram 429 не отпускает")
 
 
-async def _record(sm, row: _Row, **values: Any) -> None:
-    async with sm() as session:
-        await session.execute(update(BroadcastDelivery).where(BroadcastDelivery.id == row.id).values(**values))
-        if values.get("status") == DeliveryStatus.BLOCKED and row.participant_id:
-            await session.execute(
-                update(Participant).where(Participant.id == row.participant_id).values(is_blocked_bot=True)
-            )
-        await session.commit()
+async def _record(session: AsyncSession, row: _Row, **values: Any) -> None:
+    await session.execute(update(BroadcastDelivery).where(BroadcastDelivery.id == row.id).values(**values))
+    if values.get("status") == DeliveryStatus.BLOCKED and row.participant_id:
+        await session.execute(update(Participant).where(Participant.id == row.participant_id).values(is_blocked_bot=True))
+    await session.commit()  # коммит после каждого сообщения: рестарт не потеряет прогресс
+
+
+STATUS_CHECK_EVERY = 10  # как часто внутри пачки проверять, не отменили ли рассылку
 
 
 async def process_batch(bot: Bot, sm: async_sessionmaker[AsyncSession], broadcast_id: int) -> int:
@@ -290,38 +292,39 @@ async def process_batch(bot: Bot, sm: async_sessionmaker[AsyncSession], broadcas
     rows = await _claim(sm, broadcast_id)
     if not rows:
         return 0
+    # Одна сессия на пачку: на каждое сообщение — один UPDATE и коммит, без лишних подключений.
     async with sm() as session:
         b = await session.get(Broadcast, broadcast_id)
         markups = {lang: await poll_rows(session, b, lang) for lang in {r.lang for r in rows}}
-    for row in rows:
-        async with sm() as session:  # рассылку могли отменить посреди пачки
-            status = await session.scalar(select(Broadcast.status).where(Broadcast.id == broadcast_id))
-        if status != BroadcastStatus.RUNNING:
-            await _record(sm, row, attempts=BroadcastDelivery.attempts - 1, next_attempt_at=None)
-            continue
-        try:
-            msg = await _send_with_retry_after(bot, row, b, markups.get(row.lang))
-        except TelegramForbiddenError as exc:
-            await _record(sm, row, status=DeliveryStatus.BLOCKED, error=str(exc)[:500])
-        except (TelegramBadRequest, TelegramNotFound) as exc:
-            # Ошибка в самих данных (чат не найден, битый file_id) — повтор не поможет.
-            await _record(sm, row, status=DeliveryStatus.FAILED, error=str(exc)[:500])
-        except Exception as exc:
-            async with sm() as session:
-                attempts = await session.scalar(select(BroadcastDelivery.attempts).where(BroadcastDelivery.id == row.id))
-            if attempts >= MAX_ATTEMPTS:
-                await _record(sm, row, status=DeliveryStatus.FAILED, error=repr(exc)[:500])
+        await session.commit()
+        for n, row in enumerate(rows):
+            if n % STATUS_CHECK_EVERY == 0:  # рассылку могли отменить посреди пачки
+                status = await session.scalar(select(Broadcast.status).where(Broadcast.id == broadcast_id))
+                await session.commit()
+            if status != BroadcastStatus.RUNNING:
+                await _record(session, row, attempts=BroadcastDelivery.attempts - 1, next_attempt_at=None)
+                continue
+            try:
+                msg = await _send_with_retry_after(bot, row, b, markups.get(row.lang))
+            except TelegramForbiddenError as exc:
+                await _record(session, row, status=DeliveryStatus.BLOCKED, error=str(exc)[:500])
+            except (TelegramBadRequest, TelegramNotFound) as exc:
+                # Ошибка в самих данных (чат не найден, битый file_id) — повтор не поможет.
+                await _record(session, row, status=DeliveryStatus.FAILED, error=str(exc)[:500])
+            except Exception as exc:
+                if row.attempts >= MAX_ATTEMPTS:
+                    await _record(session, row, status=DeliveryStatus.FAILED, error=repr(exc)[:500])
+                else:
+                    await _record(
+                        session,
+                        row,
+                        error=repr(exc)[:500],
+                        next_attempt_at=datetime.now(UTC) + timedelta(seconds=RETRY_DELAY_SECONDS * row.attempts),
+                    )
             else:
                 await _record(
-                    sm,
-                    row,
-                    error=repr(exc)[:500],
-                    next_attempt_at=datetime.now(UTC) + timedelta(seconds=RETRY_DELAY_SECONDS * attempts),
+                    session, row, status=DeliveryStatus.SENT, message_id=msg.message_id, sent_at=datetime.now(UTC), error=None
                 )
-        else:
-            await _record(
-                sm, row, status=DeliveryStatus.SENT, message_id=msg.message_id, sent_at=datetime.now(UTC), error=None
-            )
     return len(rows)
 
 

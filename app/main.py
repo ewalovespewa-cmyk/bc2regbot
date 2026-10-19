@@ -9,6 +9,7 @@ import contextlib
 from aiogram import Bot, Dispatcher
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler
 from aiohttp import web
+from pydantic import ValidationError
 
 from app.bot.setup import create_bot, create_dispatcher
 from app.config import Settings, get_settings
@@ -86,7 +87,12 @@ async def _lifecycle(app: web.Application):
 
 
 def main() -> None:
-    settings = get_settings()
+    try:
+        settings = get_settings()
+    except ValidationError as exc:
+        # Текст ValidationError содержит значения настроек (то есть секреты) — печатаем только имена полей.
+        problems = ", ".join(f"{'.'.join(map(str, e['loc'])).upper()} ({e['type']})" for e in exc.errors())
+        raise SystemExit(f"Неверные или отсутствующие переменные окружения: {problems}") from None
     setup_logging(settings.log_level, settings.log_json)
     web.run_app(build_app(settings), host="0.0.0.0", port=settings.port, print=None, access_log=None)
 

@@ -97,7 +97,7 @@ checkin:
   already: "You are already checked in at {time} 👌"
   expired: "⏱ The QR code has expired — scan the screen at the entrance again."
   closed: "Check-in is closed right now. If you are at the entrance, ask a volunteer."
-  need_link: "Almost done! Let us link your account first (button above) — and I will check you in right away."
+  need_link: "Almost done! Let us link your account first: open the personal link from your email or tap “📱 Share contact” below — and I will check you in right away."
   too_many: "Too many attempts. Please ask a volunteer at the entrance or tap the button below."
   call_organizer: "🙋 Call an organizer"
   called: "We told the organizers — someone will come to you. Please wait at the entrance 🙏"

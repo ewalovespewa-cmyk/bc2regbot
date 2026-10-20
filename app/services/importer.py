@@ -102,6 +102,9 @@ class _Columns:
                 headers.setdefault(key.strip().lower(), key)
         self._headers = headers
 
+    def headers(self) -> list[str]:
+        return list(self._headers.values())
+
     def find(self, *names: str) -> str | None:
         for name in names:
             if name and (actual := self._headers.get(name.strip().lower())):
@@ -172,7 +175,8 @@ async def import_applications(
         f: cols.find(*([overrides[f]] if f in overrides else []), *aliases) for f, aliases in DEFAULT_COLUMN_ALIASES.items()
     }
     if not resolved["email"]:
-        raise ImportAborted("В таблице нет колонки с email («Email» или «Почта»). Проверь SHEET_COLUMN_MAP.")
+        found = ", ".join(f"«{h}»" for h in cols.headers()[:12]) or "—"
+        raise ImportAborted(f"Нет колонки с email («Email» или «Почта»). Нашёл колонки: {found}.")
     if not resolved["full_name"]:
         raise ImportAborted("В таблице нет колонки с именем («Full name» или «Имя»). Проверь SHEET_COLUMN_MAP.")
     sel_col = cols.find(selected_column, *SELECTED_COLUMN_ALIASES)

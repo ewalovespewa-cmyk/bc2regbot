@@ -105,6 +105,7 @@ class SheetsClient:
             raise SheetsError("Google Sheets не настроен: нужны SHEET_ID и GOOGLE_SERVICE_ACCOUNT_JSON")
         self.settings = settings
         self._spreadsheet = None
+        self.last_read_title = ""
 
     def _open(self):
         if self._spreadsheet is None:
@@ -133,13 +134,30 @@ class SheetsClient:
             raise SheetsError(f"Google Sheets: не удалось {what}: {exc}") from exc
         raise AssertionError("unreachable")
 
+    SOURCE_NAMES = ("кандидаты", "candidates", "заявки", "applications")
+
     def _worksheet(self, name: str):
+        """Лист-источник заявок. Без имени: вкладка «Кандидаты» (или «Заявки»), иначе первая вкладка,
+        которая не принадлежит боту («Прошли», «Чекин …», «calls»)."""
         spreadsheet = self._open()
-        return spreadsheet.worksheet(name) if name else spreadsheet.get_worksheet(0)
+        if name:
+            return spreadsheet.worksheet(name)
+        sheets = spreadsheet.worksheets()
+        for ws in sheets:
+            if ws.title.strip().lower() in self.SOURCE_NAMES:
+                return ws
+        own = {self.settings.sheet_status_worksheet.lower(), "calls"}
+        for ws in sheets:
+            title = ws.title.strip().lower()
+            if title not in own and not title.startswith("чекин "):
+                return ws
+        return sheets[0]
 
     async def read_rows(self, worksheet: str) -> list[Row]:
         def fetch() -> list[Row]:
-            values = self._worksheet(worksheet).get_all_values()
+            ws = self._worksheet(worksheet)
+            self.last_read_title = ws.title
+            values = ws.get_all_values()
             if not values:
                 return []
             header = [h.strip() for h in values[0]]

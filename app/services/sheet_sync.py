@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.services.exports import all_tables
-from app.services.importer import ImportReport, TeamsReport, assign_teams, import_applications
+from app.services.importer import ImportAborted, ImportReport, TeamsReport, assign_teams, import_applications
 from app.services.sources import Row, SheetsClient
 
 
@@ -23,7 +23,16 @@ async def import_rows(
 
 async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[ImportReport, TeamsReport | None]:
     client = SheetsClient(settings)
-    report = await import_rows(session, settings, await client.read_rows(settings.sheet_applications_worksheet))
+    rows = await client.read_rows(settings.sheet_applications_worksheet)
+    if not rows:
+        raise ImportAborted(
+            f"Лист «{client.last_read_title}» в Google-таблице пустой. Положите туда заявки "
+            "(шапка + строки, как в таблице кандидатов) — или назовите лист с заявками «Кандидаты»."
+        )
+    try:
+        report = await import_rows(session, settings, rows)
+    except ImportAborted as exc:
+        raise ImportAborted(f"Лист «{client.last_read_title}»: {exc}") from exc
     teams_report = None
     if settings.sheet_teams_worksheet:
         teams_report = await assign_teams(session, await client.read_rows(settings.sheet_teams_worksheet))

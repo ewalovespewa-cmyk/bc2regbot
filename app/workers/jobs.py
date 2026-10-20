@@ -1,6 +1,10 @@
 """Периодические задачи: рассылки, напоминания опросов, автоимпорт и bot_status в Google Sheet."""
+import html
+
 from app.logs import get_logger
 from app.services import broadcast, polls
+from app.services.importer import ImportAborted
+from app.services.sources import SheetsError
 from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting
 from app.services.sheet_sync import import_from_sheet, push_status_to_sheet
 from app.workers.runner import Job, JobContext
@@ -8,9 +12,25 @@ from app.workers.runner import Job, JobContext
 log = get_logger(__name__)
 
 
+async def _sheet_problem(ctx: JobContext, key: str, text: str) -> None:
+    """Проблема с таблицей (нет вкладки, нет доступа, Google лежит) — не трейсбек, а понятное
+    сообщение организаторам, не чаще раза в час. Задача спокойно попробует снова через минуту."""
+    from app.services.notify import notify_admins
+
+    log.warning("sheet_problem", key=key, text=text)
+    await notify_admins(
+        ctx.bot, ctx.settings, f"📄 <b>Google-таблица</b>\n{html.escape(text)}",
+        redis=ctx.redis, throttle_key=f"sheet:{key}", throttle_seconds=3600,
+    )
+
+
 async def sheet_status_sync(ctx: JobContext) -> None:
-    async with ctx.sessionmaker() as session:
-        count = await push_status_to_sheet(session, ctx.settings)
+    try:
+        async with ctx.sessionmaker() as session:
+            count = await push_status_to_sheet(session, ctx.settings)
+    except SheetsError as exc:
+        await _sheet_problem(ctx, "write", f"Не получилось обновить вкладки бота: {exc}")
+        return
     log.info("sheet_status_synced", rows=count)
 
 
@@ -18,7 +38,12 @@ async def auto_import(ctx: JobContext) -> None:
     async with ctx.sessionmaker() as session:
         if not await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT):
             return
-        report, _ = await import_from_sheet(session, ctx.settings)
+        try:
+            report, _ = await import_from_sheet(session, ctx.settings)
+        except (SheetsError, ImportAborted) as exc:
+            await session.rollback()
+            await _sheet_problem(ctx, "import", f"Автоимпорт ждёт: {exc}")
+            return
         await session.commit()
     log.info("auto_import_done", created=report.created, updated=report.updated, errors=len(report.errors))
     if (report.created or report.deselected) and ctx.settings.admin_chat_id:

@@ -63,3 +63,27 @@ async def test_scheduler_runs_jobs_when_leader(redis):
     finally:
         await sched.stop()
     assert await redis.get("workers:leader") is None  # лок отпущен при остановке
+
+
+async def test_missing_sheet_tab_gives_friendly_throttled_alert(redis, monkeypatch):
+    from app.services.sources import SheetMissing
+    from app.workers import jobs
+
+    async def missing(session, settings):
+        raise SheetMissing("В Google-таблице нет вкладки «Прошли отбор».")
+
+    async def enabled(session, key, default=None):
+        return True
+
+    session = AsyncMock()
+    ctx = JobContext(bot=AsyncMock(), redis=redis, sessionmaker=MagicMock(return_value=session),
+                     settings=MagicMock(admin_chat_id=-100))
+    session.__aenter__.return_value = session
+    monkeypatch.setattr(jobs, "import_from_sheet", missing)
+    monkeypatch.setattr(jobs, "get_setting", enabled)
+
+    await jobs.auto_import(ctx)  # не бросает исключение
+    await jobs.auto_import(ctx)
+    sent = ctx.bot.send_message.await_args_list
+    assert len(sent) == 1  # второй раз — тишина (раз в час)
+    assert "нет вкладки «Прошли отбор»" in sent[0].args[1] and "Traceback" not in sent[0].args[1]

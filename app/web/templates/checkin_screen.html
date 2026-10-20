@@ -61,11 +61,13 @@
   .scan .lime { color: var(--lime); }
   .hint { color: var(--muted); font-size: clamp(14px, 1.3vw, 22px); max-width: 34em; line-height: 1.4; margin: 0; }
 
-  .counter { display: flex; align-items: baseline; gap: .4em; font-variant-numeric: tabular-nums; }
-  .counter .num { color: var(--lime); font-weight: 900; font-size: clamp(56px, 7vw, 140px); line-height: .9; letter-spacing: -.02em; }
-  .counter .of { font-weight: 800; font-size: clamp(22px, 2.4vw, 44px); color: var(--white); }
-  .counter .label { display: block; color: var(--muted); text-transform: uppercase; font-weight: 600;
-    letter-spacing: .05em; font-size: clamp(12px, 1vw, 18px); }
+  .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.4vh; counter-reset: step; }
+  .steps li { counter-increment: step; display: flex; align-items: center; gap: .8em;
+    font-weight: 700; font-size: clamp(16px, 1.7vw, 30px); }
+  .steps li::before { content: counter(step); flex: none; display: grid; place-items: center;
+    width: 1.7em; height: 1.7em; background: var(--lime); color: var(--ink); font-weight: 900; }
+  .steps .btn { border: 1px solid var(--line); padding: .1em .45em; white-space: nowrap; }
+  .steps .bot { color: var(--lime); }
 
   /* --- правая колонка: QR --- */
   .qr-col { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2vh; }
@@ -124,15 +126,14 @@
       <span class="chip">📍 Nazarbayev University</span>
     </div>
     <div>
-      <p class="scan">Наведи камеру —<br><span class="lime">Telegram отметит тебя</span></p>
+      <p class="scan">Отметься<br><span class="lime">через бота в Telegram</span></p>
     </div>
-    <p class="hint">Открой камеру телефона или кнопку «✅ Отметиться» в боте участника. Код меняется каждые 30 секунд — фото экрана не сработает.</p>
-    <div class="counter">
-      <div>
-        <span class="label">Уже на месте</span>
-        <span class="num" id="checked">0</span><span class="of" id="total">/ 0</span>
-      </div>
-    </div>
+    <ol class="steps">
+      <li><span>Открой бота <span class="bot" id="bot">участника в Telegram</span></span></li>
+      <li><span>Нажми внизу <span class="btn">✅ Отметиться</span></span></li>
+      <li><span>Наведи сканер на этот QR</span></li>
+    </ol>
+    <p class="hint">Код меняется каждые 30 секунд — фото экрана не сработает. Нет кнопки или не получается — подойди к волонтёру.</p>
   </section>
 
   <section class="qr-col" id="content">
@@ -149,8 +150,7 @@
 
   function render(s) {
     el("day").textContent = s.day ? s.day : "Чекин";
-    el("checked").textContent = s.checked;
-    el("total").textContent = `/ ${s.total}`;
+    if (s.bot) el("bot").textContent = "@" + s.bot;
     if (s.state !== "open") {
       const [title, sub] = {
         closed: ["Чекин закрыт", "Откроется в начале дня — подходи к волонтёрам у входа"],

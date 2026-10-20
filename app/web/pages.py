@@ -46,7 +46,7 @@ async def checkin_screen_state(request: web.Request) -> web.Response:
         if day is not None:
             checked = await session.scalar(select(func.count()).select_from(Checkin).where(Checkin.event_day_id == day.id)) or 0
 
-    body: dict = {"checked": checked, "total": total, "day": day.label if day else None}
+    body: dict = {"checked": checked, "total": total, "day": day.label if day else None, "bot": settings.bot_username}
     if day is None or not is_open(day):
         body["state"] = "closed"
     elif not day.is_screen_enabled:

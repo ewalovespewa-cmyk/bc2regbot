@@ -67,7 +67,7 @@ class Settings(BaseSettings):
     )
     sheet_team_column: str = "Team"
     sheet_sync_minutes: int = 2
-    auto_import_minutes: int = 30
+    auto_import_minutes: int = 2
     sheets_timeout_seconds: int = 30
 
     # Дни мероприятия: создаются при старте, если их ещё нет в БД (дальше админ правит командой /day).

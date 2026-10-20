@@ -216,3 +216,17 @@ async def test_ambiguous_username_asks_contact(h, session):
     await session.commit()
     await h.text(ARU, "/start", username="aru_b")
     assert h.session.sent(ARU)[-1].reply_markup.keyboard[0][0].request_contact is True
+
+
+async def test_account_held_by_deselected_record_moves_to_active_one(h, session):
+    """Старая запись (снята с отбора) держит Telegram — новая заявка с тем же username всё равно привязывается."""
+    old = await participant(session, "gone@mail.com")  # is_selected=False
+    old.telegram_user_id, old.tg_username_form = STRANGER, "akhmat_tg"
+    session.add(Participant(email="anton@mail.com", full_name="Антон", phone="+77759599875",
+                            invite_token="ANTONtoken01", tg_username_form="akhmat_tg"))
+    await session.commit()
+
+    await h.text(STRANGER, "/start", username="Akhmat_TG")
+    assert (await participant(session, "anton@mail.com")).telegram_user_id == STRANGER
+    assert (await participant(session, "gone@mail.com")).telegram_user_id is None
+    assert "Антон" in h.session.texts(STRANGER)[0]  # приветствие, номер не спрашивали

@@ -65,7 +65,14 @@ async def _link(session: AsyncSession, participant: Participant, user: TelegramU
 
     other = await session.scalar(select(Participant).where(Participant.telegram_user_id == user.id))
     if other is not None:
-        return LinkResult(LinkStatus.ACCOUNT_TAKEN, participant, other)
+        if other.is_selected:
+            return LinkResult(LinkStatus.ACCOUNT_TAKEN, participant, other)
+        # Аккаунт держит запись, снятая с отбора (старая заявка, тестовая строка) — она больше не даёт
+        # доступа, поэтому освобождаем аккаунт и привязываем его к действующей записи.
+        other.telegram_user_id = None
+        other.telegram_username = None
+        other.linked_at = None
+        await session.flush()
 
     participant.telegram_user_id = user.id
     participant.telegram_username = username
@@ -135,7 +142,9 @@ async def link_by_username(session: AsyncSession, user: TelegramUser) -> LinkRes
     free = [p for p in candidates if p.telegram_user_id is None]
     if len(free) != 1:
         return LinkResult(LinkStatus.NOT_FOUND)
-    if await session.scalar(select(Participant.id).where(Participant.telegram_user_id == user.id)):
+    if await session.scalar(
+        select(Participant.id).where(Participant.telegram_user_id == user.id, Participant.is_selected)
+    ):
         return LinkResult(LinkStatus.NOT_FOUND)  # аккаунт уже привязан к другой заявке — пусть решают люди
     return await _link(session, free[0], user)
 

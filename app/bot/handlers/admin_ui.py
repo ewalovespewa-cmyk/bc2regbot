@@ -37,7 +37,7 @@ from app.services.audit import log_admin_action
 from app.services.exports import all_tables, tables_to_xlsx
 from app.services.importer import ImportAborted, assign_teams
 from app.services.roles import has_role
-from app.services.settings_store import AUTO_IMPORT_ENABLED, get_setting, set_setting
+from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting, set_setting
 from app.services.sheet_sync import format_import_report, format_teams_report, import_from_sheet, import_rows, push_status_to_sheet
 from app.services.sources import SheetsError, parse_table_file
 
@@ -131,8 +131,12 @@ async def _people_text(session: AsyncSession, settings: Settings) -> str:
     linked = await session.scalar(
         select(func.count()).select_from(Participant).where(Participant.is_selected, Participant.telegram_user_id.is_not(None))
     ) or 0
-    auto = await get_setting(session, AUTO_IMPORT_ENABLED, False)
-    sheet = "подключён" if settings.sheets_enabled else "не подключён — работаем через файлы"
+    auto = await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT)
+    sheet = (
+        f"подключён, доступ — у всех из вкладки «{settings.sheet_applications_worksheet}»"
+        if settings.sheets_enabled
+        else "не подключён — работаем через файлы"
+    )
     return (
         f"👥 <b>Участники</b>\nОтобрано: <b>{total}</b>, открыли бота: <b>{linked}</b>\n"
         f"Google Sheet: {sheet}" + (f"\nАвтоимпорт: {'вкл' if auto else 'выкл'}" if settings.sheets_enabled else "")
@@ -146,12 +150,12 @@ async def on_people(callback: CallbackQuery, session: AsyncSession, settings: Se
         rows.append([_btn("📥 Импорт отобранных (файл)", "a:imp:selected")])
         rows.append([_btn("📥 Импорт всех из файла", "a:imp:all"), _btn("👥 Команды из файла", "a:imp:teams")])
         if settings.sheets_enabled:
-            rows.append([_btn("🔄 Импорт из Google Sheet", "a:imp:sheet")])
+            rows.append([_btn(f"🔄 Забрать «{settings.sheet_applications_worksheet}» сейчас", "a:imp:sheet")])
     rows.append([_btn("📊 Выгрузить Excel", "a:export")])
     if settings.sheets_enabled:
         rows.append([_btn("🔄 Обновить Google Sheet сейчас", "a:sync")])
         if has_role(role, Role.SUPERADMIN):
-            auto = await get_setting(session, AUTO_IMPORT_ENABLED, False)
+            auto = await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT)
             rows.append([_btn(f"🤖 Автоимпорт: {'выключить' if auto else 'включить'}", "a:autoimp")])
     rows.append(BACK)
     await _edit_or_send(callback, await _people_text(session, settings), _kb(*rows))
@@ -290,7 +294,7 @@ async def on_sync(callback: CallbackQuery, session: AsyncSession, settings: Sett
 
 @router.callback_query(F.data == "a:autoimp", RoleFilter(Role.SUPERADMIN))
 async def on_autoimport(callback: CallbackQuery, session: AsyncSession, settings: Settings, role: Role) -> None:
-    enabled = not await get_setting(session, AUTO_IMPORT_ENABLED, False)
+    enabled = not await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT)
     await set_setting(session, AUTO_IMPORT_ENABLED, enabled)
     await log_admin_action(session, callback.from_user.id, "autoimport", "on" if enabled else "off")
     await session.flush()

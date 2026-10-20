@@ -77,7 +77,7 @@ async def _seed_checkins(session):
 async def test_tables_and_excel(session):
     await _seed_checkins(session)
     tables = await all_tables(session, "bc_bot", "Asia/Almaty")
-    assert [t.name for t in tables] == ["Прошли", "Чекин День 1", "Чекин День 2"]
+    assert [t.name for t in tables] == ["Статус бота", "Чекин День 1", "Чекин День 2"]
     assert len(tables[0].rows) == 3 and len(tables[1].rows) == 3 and len(tables[2].rows) == 1
     assert tables[2].rows[0][6] == "волонтёр"
 
@@ -85,7 +85,7 @@ async def test_tables_and_excel(session):
     import io
 
     wb = load_workbook(io.BytesIO(tables_to_xlsx(tables)))
-    assert wb.sheetnames == ["Прошли", "Чекин День 1", "Чекин День 2"]
+    assert wb.sheetnames == ["Статус бота", "Чекин День 1", "Чекин День 2"]
     assert parse_xlsx(tables_to_xlsx(tables))[0]["Ссылка-приглашение"].startswith("https://t.me/bc_bot?start=")
 
 
@@ -102,7 +102,7 @@ async def test_push_to_sheet_writes_all_tabs(session, monkeypatch):
 
     monkeypatch.setattr("app.services.sheet_sync.SheetsClient", FakeClient)
     count = await push_status_to_sheet(session, Settings(_env_file=None, sheet_id="x", google_service_account_json="{}"))
-    assert count == 3 and written == ["Прошли", "Чекин День 1", "Чекин День 2"]
+    assert count == 3 and written == ["Статус бота", "Чекин День 1", "Чекин День 2"]
 
 
 async def test_reset_and_delete_day(session):
@@ -199,7 +199,7 @@ async def test_export_button_sends_excel(h, session):
     await _seed_checkins(session)
     await h.callback(ADMIN_ID, ADMIN_ID, "a:export")
     doc = next(c for c in h.session.calls if isinstance(c, SendDocument))
-    assert "Прошли" in doc.caption and "Чекин День 1" in doc.caption
+    assert "Статус бота" in doc.caption and "Чекин День 1" in doc.caption
 
 
 async def test_poll_start_button(h, session):
@@ -208,3 +208,80 @@ async def test_poll_start_button(h, session):
 
     assert await session.scalar(select(func.count()).select_from(Poll)) == 1
     assert "Опрос #1 запущен" in h.session.last_text(ADMIN_ID)
+
+
+# ---------------------------------------------------------------- флоу «Кандидаты → Прошли отбор»
+
+PASSED_HEADER = CANDIDATES.splitlines()[0]
+
+
+def _passed_rows(*lines: str):
+    # «Состояние» в скопированных строках может остаться «заявка подана» — во вкладке-источнике это не важно.
+    return parse_csv(("\n".join([PASSED_HEADER, *lines]) + "\n").encode())
+
+
+ROW_A = "заявка подана,Aru,aru@x.kz,,Solo participant,,,87011112233,@aru_b,NU,1,CS,Yes,,,2026-10-19 10:00,a1,,,"
+ROW_B = "заявка подана,Dana,dana@x.kz,,Already have a team,Captain,Rockets,87022223344,@dana_o,NU,1,CS,Yes,,,2026-10-19 10:01,b1,,,"
+
+
+async def test_list_mode_every_row_is_access_and_removed_rows_lose_it(session, monkeypatch):
+    from app.services import sheet_sync
+
+    sheet = {"rows": _passed_rows(ROW_A, ROW_B)}
+
+    class FakeClient:
+        last_read_title = "Прошли отбор"
+
+        def __init__(self, settings):
+            pass
+
+        async def read_rows(self, worksheet):
+            assert worksheet == "Прошли отбор"
+            return sheet["rows"]
+
+    monkeypatch.setattr(sheet_sync, "SheetsClient", FakeClient)
+    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
+
+    report, _ = await sheet_sync.import_from_sheet(session, settings)
+    await session.commit()
+    assert report.created == 2 and report.not_selected == 0  # «заявка подана» не мешает
+
+    sheet["rows"] = _passed_rows(ROW_B)  # Aru убрали из вкладки
+    report, _ = await sheet_sync.import_from_sheet(session, settings)
+    await session.commit()
+    assert report.deselected == 1
+    session.expire_all()
+    assert await session.scalar(select(Participant.is_selected).where(Participant.email == "aru@x.kz")) is False
+
+    sheet["rows"] = _passed_rows(ROW_A, ROW_B)  # вернули — доступ снова есть, ссылка прежняя
+    await sheet_sync.import_from_sheet(session, settings)
+    await session.commit()
+    session.expire_all()
+    assert await session.scalar(select(Participant.is_selected).where(Participant.email == "aru@x.kz")) is True
+
+
+async def test_list_mode_guard_against_wiped_tab(session, monkeypatch):
+    from app.services import sheet_sync
+
+    rows = [f"заявка подана,P{i},p{i}@x.kz,,Solo participant,,,8700000{i:04d},,NU,1,CS,Yes,,,,id{i},,," for i in range(30)]
+    state = {"rows": _passed_rows(*rows)}
+
+    class FakeClient:
+        last_read_title = "Прошли отбор"
+
+        def __init__(self, settings):
+            pass
+
+        async def read_rows(self, worksheet):
+            return state["rows"]
+
+    monkeypatch.setattr(sheet_sync, "SheetsClient", FakeClient)
+    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
+    await sheet_sync.import_from_sheet(session, settings)
+    await session.commit()
+
+    state["rows"] = _passed_rows(rows[0])  # случайно удалили почти всех
+    report, _ = await sheet_sync.import_from_sheet(session, settings)
+    await session.commit()
+    assert report.deselected == 0 and report.deselect_blocked == 29
+    assert await session.scalar(select(func.count()).select_from(Participant).where(Participant.is_selected)) == 30

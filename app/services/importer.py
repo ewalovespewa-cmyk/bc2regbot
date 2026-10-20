@@ -64,6 +64,7 @@ class ImportReport:
     deselected: int = 0
     teams_created: int = 0
     duplicates: int = 0  # повторные заявки того же email (взята последняя)
+    deselect_blocked: int = 0  # столько человек пропало из списка разом — не сняли, это похоже на ошибку
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -167,6 +168,7 @@ async def import_applications(
     selected_values: frozenset[str] = frozenset({"yes"}),
     team_column: str = "Team",
     assume_selected: bool = False,
+    deselect_missing: bool = False,
 ) -> ImportReport:
     """Записывает отобранных в БД. Коммит делает вызывающий код."""
     overrides = column_map or {}
@@ -189,6 +191,7 @@ async def import_applications(
 
     report = ImportReport(rows=len(rows))
     existing = {p.email: p for p in (await session.scalars(select(Participant))).all()}
+    selected_before = sum(p.is_selected for p in existing.values())
     taken_tokens = set((await session.scalars(select(Participant.invite_token))).all())
     teams = await _teams_by_name(session)
     # Человек мог подать заявку несколько раз — берём последнюю строку с его email.
@@ -261,6 +264,18 @@ async def import_applications(
             # Команды ещё нет (или задают её отдельным листом) — участник пока соло-команда.
             team, created = await _get_or_create_team(session, teams, solo_team_name(email), is_solo=True)
             participant.team_id = team.id
+
+    if deselect_missing:
+        # Источник — полный список прошедших: кого в нём больше нет, тому закрываем доступ.
+        # Защита от случайно очищенной вкладки: если пропало слишком много сразу — ничего не снимаем.
+        missing = [p for email, p in existing.items() if p.is_selected and email not in latest]
+        limit = max(10, selected_before // 3)
+        if len(missing) > limit:
+            report.deselect_blocked = len(missing)
+        else:
+            for p in missing:
+                p.is_selected = False
+            report.deselected += len(missing)
 
     await session.flush()
     await _drop_empty_solo_teams(session)

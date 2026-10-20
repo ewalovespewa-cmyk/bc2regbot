@@ -22,7 +22,7 @@ from app.services.sheet_sync import (
     import_rows,
     push_status_to_sheet,
 )
-from app.services.settings_store import AUTO_IMPORT_ENABLED, get_setting, set_setting
+from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting, set_setting
 from app.services.sources import SheetsError, parse_table_file
 
 router = Router(name="admin_import")
@@ -149,7 +149,7 @@ async def cmd_autoimport(message: Message, command: CommandObject, session: Asyn
     if arg in {"on", "off"}:
         await set_setting(session, AUTO_IMPORT_ENABLED, arg == "on")
         await log_admin_action(session, message.from_user.id, "autoimport", arg)
-    enabled = await get_setting(session, AUTO_IMPORT_ENABLED, False)
+    enabled = await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT)
     note = "" if settings.sheets_enabled else "\n(Google Sheet не подключён — автоимпорт начнёт работать после подключения.)"
     await message.answer(
         f"Автоимпорт из Google Sheet каждые {settings.auto_import_minutes} мин: "

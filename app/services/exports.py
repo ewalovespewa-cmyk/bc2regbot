@@ -1,4 +1,4 @@
-"""Выгрузки по вкладкам: «Прошли» (все отобранные со ссылками и статусами) и по вкладке
+"""Выгрузки по вкладкам: «Статус бота» (все отобранные со ссылками и статусами) и по вкладке
 на каждый день чекина. Одни и те же таблицы пишутся в Google Sheet и в Excel-файл.
 """
 import io
@@ -48,8 +48,8 @@ async def _attendance(session: AsyncSession) -> dict[int, tuple[str, str | None,
     return {pid: (label, reason, source) for pid, label, reason, source in rows}
 
 
-async def passed_table(session: AsyncSession, bot_username: str, timezone: str, name: str = "Прошли") -> Table:
-    """Вкладка «Прошли»: строка = отобранный участник. Отсюда берут ссылку для письма."""
+async def passed_table(session: AsyncSession, bot_username: str, timezone: str, name: str = "Статус бота") -> Table:
+    """Вкладка «Статус бота»: строка = отобранный участник. Отсюда берут ссылку для письма."""
     tz = ZoneInfo(timezone)
     days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
     answers = await _attendance(session)
@@ -117,7 +117,7 @@ async def checkin_table(session: AsyncSession, day: EventDay, timezone: str) -> 
     return Table(checkin_tab_name(day), header, rows)
 
 
-async def all_tables(session: AsyncSession, bot_username: str, timezone: str, passed_name: str = "Прошли") -> list[Table]:
+async def all_tables(session: AsyncSession, bot_username: str, timezone: str, passed_name: str = "Статус бота") -> list[Table]:
     tables = [await passed_table(session, bot_username, timezone, passed_name)]
     for day in (await session.scalars(select(EventDay).order_by(EventDay.date))).all():
         tables.append(await checkin_table(session, day, timezone))
@@ -125,7 +125,7 @@ async def all_tables(session: AsyncSession, bot_username: str, timezone: str, pa
 
 
 async def bot_status_table(session: AsyncSession, bot_username: str, timezone: str) -> tuple[list[str], list[list[str]]]:
-    """Вкладка «Прошли» как (заголовок, строки) — для CSV."""
+    """Вкладка «Статус бота» как (заголовок, строки) — для CSV."""
     table = await passed_table(session, bot_username, timezone)
     return table.header, table.rows
 

@@ -55,8 +55,13 @@ class Settings(BaseSettings):
     sheet_id: str = ""
     # Содержимое JSON-ключа сервис-аккаунта целиком (или base64 от него).
     google_service_account_json: str = ""
-    sheet_applications_worksheet: str = ""  # пусто → первый лист
-    sheet_status_worksheet: str = "Прошли"  # + вкладки «Чекин <день>» на каждый день
+    # Вкладка, откуда бот берёт участников. По умолчанию — «Прошли отбор»: туда команда переносит
+    # строки прошедших из «Кандидаты» в том же формате. Есть строка — есть доступ к боту.
+    sheet_applications_worksheet: str = "Прошли отбор"
+    # True: каждая строка вкладки-источника = отобран (колонка «Состояние» не нужна), а кого удалили
+    # из вкладки — тому доступ закрывается. False: отбор по колонке Selected/«Состояние».
+    sheet_source_all_selected: bool = True
+    sheet_status_worksheet: str = "Статус бота"  # бот пишет сюда ссылки и статусы + вкладки «Чекин <день>»
     sheet_teams_worksheet: str = ""  # лист "team_name, email"; пусто → не читаем
     # Поле участника → название колонки, если оно не из стандартных (см. DEFAULT_COLUMN_ALIASES в importer.py).
     sheet_column_map: dict[str, str] = {}
@@ -67,7 +72,7 @@ class Settings(BaseSettings):
     )
     sheet_team_column: str = "Team"
     sheet_sync_minutes: int = 2
-    auto_import_minutes: int = 2
+    auto_import_minutes: int = 1
     sheets_timeout_seconds: int = 30
 
     # Дни мероприятия: создаются при старте, если их ещё нет в БД (дальше админ правит командой /day).

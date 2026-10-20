@@ -1,7 +1,7 @@
 """Периодические задачи: рассылки, напоминания опросов, автоимпорт и bot_status в Google Sheet."""
 from app.logs import get_logger
 from app.services import broadcast, polls
-from app.services.settings_store import AUTO_IMPORT_ENABLED, get_setting
+from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting
 from app.services.sheet_sync import import_from_sheet, push_status_to_sheet
 from app.workers.runner import Job, JobContext
 
@@ -16,7 +16,7 @@ async def sheet_status_sync(ctx: JobContext) -> None:
 
 async def auto_import(ctx: JobContext) -> None:
     async with ctx.sessionmaker() as session:
-        if not await get_setting(session, AUTO_IMPORT_ENABLED, False):
+        if not await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT):
             return
         report, _ = await import_from_sheet(session, ctx.settings)
         await session.commit()
@@ -25,6 +25,15 @@ async def auto_import(ctx: JobContext) -> None:
         await ctx.bot.send_message(
             ctx.settings.admin_chat_id,
             f"📥 Автоимпорт: новых {report.created}, снято с отбора {report.deselected}, ошибок {len(report.errors)}.",
+        )
+    if report.deselect_blocked:
+        from app.services.notify import notify_admins
+
+        await notify_admins(
+            ctx.bot, ctx.settings,
+            f"🛑 Во вкладке «{ctx.settings.sheet_applications_worksheet}» пропало сразу {report.deselect_blocked} человек. "
+            "Доступ им НЕ закрыт — проверьте, не очистили ли вкладку случайно.",
+            redis=ctx.redis, throttle_key="deselect_blocked", throttle_seconds=3600,
         )
 
 

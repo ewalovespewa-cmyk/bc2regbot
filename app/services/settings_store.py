@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Setting
 
 AUTO_IMPORT_ENABLED = "auto_import_enabled"
+AUTO_IMPORT_DEFAULT = True  # если Google Sheet подключён, автоимпорт включён, пока его не выключат
 
 
 async def get_setting(session: AsyncSession, key: str, default: Any = None) -> Any:

@@ -8,7 +8,12 @@ from app.services.sources import Row, SheetsClient
 
 
 async def import_rows(
-    session: AsyncSession, settings: Settings, rows: list[Row], *, assume_selected: bool = False
+    session: AsyncSession,
+    settings: Settings,
+    rows: list[Row],
+    *,
+    assume_selected: bool = False,
+    deselect_missing: bool = False,
 ) -> ImportReport:
     return await import_applications(
         session,
@@ -18,6 +23,7 @@ async def import_rows(
         selected_values=settings.sheet_selected_values,
         team_column=settings.sheet_team_column,
         assume_selected=assume_selected,
+        deselect_missing=deselect_missing,
     )
 
 
@@ -30,7 +36,13 @@ async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[
             "(шапка + строки, как в таблице кандидатов) — или назовите лист с заявками «Кандидаты»."
         )
     try:
-        report = await import_rows(session, settings, rows)
+        report = await import_rows(
+            session,
+            settings,
+            rows,
+            assume_selected=settings.sheet_source_all_selected,
+            deselect_missing=settings.sheet_source_all_selected,
+        )
     except ImportAborted as exc:
         raise ImportAborted(f"Лист «{client.last_read_title}»: {exc}") from exc
     teams_report = None
@@ -58,6 +70,11 @@ def format_import_report(report: ImportReport) -> str:
         lines.append(f"Повторных заявок (взята последняя): {report.duplicates}")
     if report.deselected:
         lines.append(f"⚠️ Сняты с отбора: {report.deselected} (бот перестанет их пускать)")
+    if report.deselect_blocked:
+        lines.append(
+            f"🛑 Из списка пропало сразу {report.deselect_blocked} человек — похоже на ошибку, доступ НЕ закрыт. "
+            "Если это намеренно, уберите их частями или импортируйте файлом."
+        )
     if report.teams_created:
         lines.append(f"Новых команд: {report.teams_created}")
     if report.errors:

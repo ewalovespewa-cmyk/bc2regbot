@@ -12,7 +12,7 @@ import json
 from collections.abc import Callable
 from typing import Any, TypeVar
 
-from tenacity import AsyncRetrying, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import AsyncRetrying, retry_if_not_exception_type, stop_after_attempt, wait_exponential
 
 from app.config import Settings
 from app.logs import get_logger
@@ -24,6 +24,10 @@ Row = dict[str, str]
 
 class SheetsError(Exception):
     pass
+
+
+class SheetMissing(SheetsError):
+    """Нужной вкладки нет — повторять запрос бессмысленно."""
 
 
 # ---------------------------------------------------------------- CSV
@@ -122,27 +126,37 @@ class SheetsClient:
             async for attempt in AsyncRetrying(
                 stop=stop_after_attempt(4),
                 wait=wait_exponential(multiplier=2, min=2, max=30),
-                retry=retry_if_exception_type(Exception),
+                retry=retry_if_not_exception_type(SheetMissing),
                 reraise=True,
             ):
                 with attempt:
                     if attempt.retry_state.attempt_number > 1:
                         log.warning("sheets_retry", what=what, attempt=attempt.retry_state.attempt_number)
                     return await asyncio.wait_for(asyncio.to_thread(fn), timeout)
+        except SheetMissing:
+            raise
         except Exception as exc:
             log.error("sheets_failed", what=what, error=repr(exc))
             raise SheetsError(f"Google Sheets: не удалось {what}: {exc}") from exc
         raise AssertionError("unreachable")
 
     SOURCE_NAMES = ("кандидаты", "candidates", "заявки", "applications")
+    PASSED_ALIASES = ("прошли отбор", "прошедшие", "отобранные", "прошедшие отбор", "selected")
 
     def _worksheet(self, name: str):
         """Лист-источник заявок. Без имени: вкладка «Кандидаты» (или «Заявки»), иначе первая вкладка,
         которая не принадлежит боту («Прошли», «Чекин …», «calls»)."""
         spreadsheet = self._open()
-        if name:
-            return spreadsheet.worksheet(name)
         sheets = spreadsheet.worksheets()
+        if name:
+            wanted = {name.strip().lower()}
+            if name.strip().lower() in self.PASSED_ALIASES:
+                wanted |= set(self.PASSED_ALIASES)
+            for ws in sheets:
+                if ws.title.strip().lower() in wanted:
+                    return ws
+            titles = ", ".join(f"«{ws.title}»" for ws in sheets)
+            raise SheetMissing(f"В Google-таблице нет вкладки «{name}». Есть: {titles}. Создайте её и перенесите туда прошедших.")
         for ws in sheets:
             if ws.title.strip().lower() in self.SOURCE_NAMES:
                 return ws

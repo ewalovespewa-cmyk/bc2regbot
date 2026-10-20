@@ -17,8 +17,19 @@ def test_prefers_candidates_tab_anywhere():
 
 
 def test_skips_bot_own_tabs():
-    assert _client(["Прошли", "Чекин День 1", "Заявки 2026"])._worksheet("").title == "Заявки 2026"
+    assert _client(["Статус бота", "Чекин День 1", "Заявки 2026"])._worksheet("").title == "Заявки 2026"
 
 
 def test_explicit_name_wins():
     assert _client(["Кандидаты", "Мой лист"])._worksheet("Мой лист").title == "Мой лист"
+
+
+def test_source_tab_by_name_and_aliases():
+    import pytest
+
+    from app.services.sources import SheetMissing
+
+    assert _client(["Кандидаты", "Прошли отбор"])._worksheet("Прошли отбор").title == "Прошли отбор"
+    assert _client(["Кандидаты", "прошедшие"])._worksheet("Прошли отбор").title == "прошедшие"
+    with pytest.raises(SheetMissing):
+        _client(["Кандидаты", "Статус бота"])._worksheet("Прошли отбор")

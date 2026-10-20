@@ -145,7 +145,7 @@ class SheetsClient:
 
     def _worksheet(self, name: str):
         """Лист-источник заявок. Без имени: вкладка «Кандидаты» (или «Заявки»), иначе первая вкладка,
-        которая не принадлежит боту («Прошли», «Чекин …», «calls»)."""
+        которая не принадлежит боту («Статус бота», «Чекин …», «calls»)."""
         spreadsheet = self._open()
         sheets = spreadsheet.worksheets()
         if name:

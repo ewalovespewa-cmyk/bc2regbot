@@ -52,7 +52,7 @@ async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[
 
 
 async def push_status_to_sheet(session: AsyncSession, settings: Settings) -> int:
-    """Пишет вкладки «Прошли» и «Чекин <день>» в Google Sheet. Возвращает число отобранных."""
+    """Пишет вкладки «Статус бота» и «Чекин <день>» в Google Sheet. Возвращает число отобранных."""
     tables = await all_tables(session, settings.bot_username, settings.timezone, settings.sheet_status_worksheet)
     await SheetsClient(settings).write_tables(tables)
     return len(tables[0].rows)

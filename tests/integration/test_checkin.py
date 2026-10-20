@@ -198,3 +198,20 @@ async def test_qr_scan_unlinked_with_matching_username_checks_in_at_once(h, sess
     texts = h.session.texts(NEW)
     assert any("Ты отмечен" in t for t in texts)
     assert not any("Сначала привяжем" in t for t in texts)  # без контакта
+
+
+async def test_screen_command_gives_link_buttons(engine, redis, world):
+    settings = Settings(_env_file=None, superadmin_ids=frozenset({SUPER}), webhook_base_url="https://bot.example.com",
+                        screen_secret="screen-key", dashboard_secret="dash-key", checkin_secret=SECRET)
+    h = Harness(redis=redis, sessionmaker=create_sessionmaker(engine), settings=settings)
+    await h.text(ADMIN_ID, "/screen")
+    buttons = h.session.sent(ADMIN_ID)[-1].reply_markup.inline_keyboard[0]
+    assert buttons[0].url == "https://bot.example.com/checkin-screen?key=screen-key"
+    assert buttons[1].url == "https://bot.example.com/dashboard?key=dash-key"
+
+    await h.text(ADMIN_ID, "/admin")
+    urls = [b.url for row in h.session.sent(ADMIN_ID)[-1].reply_markup.inline_keyboard for b in row if b.url]
+    assert "https://bot.example.com/checkin-screen?key=screen-key" in urls
+
+    await h.text(VOL, "/admin")  # волонтёру ссылки на экран не нужны
+    assert not [b.url for row in h.session.sent(VOL)[-1].reply_markup.inline_keyboard for b in row if b.url]

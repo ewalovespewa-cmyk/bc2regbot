@@ -36,8 +36,13 @@ def _btn(text: str, data: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, callback_data=data)
 
 
-def admin_menu_keyboard(role: Role) -> InlineKeyboardMarkup:
+def admin_menu_keyboard(role: Role, settings: Settings | None = None) -> InlineKeyboardMarkup:
     rows = [[_btn("🔎 Найти участника", "adm:find")]]
+    if settings is not None and has_role(role, Role.ADMIN):
+        from app.bot.handlers.checkin import screen_links_keyboard
+
+        if links := screen_links_keyboard(settings):
+            rows.append(links.inline_keyboard[0])
     if has_role(role, Role.ADMIN):
         rows.append([_btn("📊 Статистика", "adm:stats"), _btn("✅ Чекин: дни и экран", "adm:days")])
     if has_role(role, Role.ADMIN):
@@ -54,10 +59,10 @@ def admin_menu_keyboard(role: Role) -> InlineKeyboardMarkup:
 
 
 @router.message(Command("admin"), RoleFilter(Role.VOLUNTEER))
-async def cmd_admin(message: Message, bot: Bot, role: Role) -> None:
+async def cmd_admin(message: Message, bot: Bot, role: Role, settings: Settings) -> None:
     await apply_admin_commands(bot, message.from_user.id, role)  # заодно обновим подсказки команд
     await message.answer(
-        f"🛠 <b>Админ-меню</b> · роль: {ROLE_TITLES[role]}", reply_markup=admin_menu_keyboard(role)
+        f"🛠 <b>Админ-меню</b> · роль: {ROLE_TITLES[role]}", reply_markup=admin_menu_keyboard(role, settings)
     )
 
 

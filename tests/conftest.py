@@ -26,7 +26,18 @@ os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
 
 def _local_pg_url() -> str:
     pgserver = pytest.importorskip("pgserver", reason="нет TEST_DATABASE_URL и не установлен pgserver")
-    server = pgserver.get_server(str(ROOT / ".pgdata"), cleanup_mode=None)
+    # После неожиданной остановки встроенный Postgres на Windows восстанавливается до ~минуты,
+    # а pgserver ждёт меньше и бросает AssertionError — ждём и пробуем снова.
+    import time
+
+    for attempt in range(6):
+        try:
+            server = pgserver.get_server(str(ROOT / ".pgdata"), cleanup_mode=None)
+            break
+        except AssertionError:
+            if attempt == 5:
+                raise
+            time.sleep(15)
     server.psql("DROP DATABASE IF EXISTS bc_test WITH (FORCE);")
     server.psql("CREATE DATABASE bc_test;")
     base = server.get_uri()  # postgresql://postgres:@host:port/postgres

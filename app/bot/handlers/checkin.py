@@ -183,7 +183,10 @@ async def cmd_checkin_open(message: Message, session: AsyncSession, settings: Se
         return
     await open_day(session, day)
     await log_admin_action(session, message.from_user.id, "checkin_open", day.date.isoformat())
-    await message.answer(f"🟢 Чекин открыт: {_fmt_day(day, ZoneInfo(settings.timezone))}\nЭкран: {_screen_url(settings)}")
+    await message.answer(
+        f"🟢 Чекин открыт: {_fmt_day(day, ZoneInfo(settings.timezone))}\nЭкран: {_screen_url(settings)}",
+        reply_markup=screen_links_keyboard(settings),
+    )
 
 
 @router.message(Command("checkin_close"), RoleFilter(Role.ADMIN))
@@ -205,7 +208,23 @@ async def cmd_screen(message: Message, command: CommandObject, session: AsyncSes
         day.is_screen_enabled = arg == "on"
         await log_admin_action(session, message.from_user.id, "screen", arg)
     state = "—" if day is None else ("включён" if day.is_screen_enabled else "выключен")
-    await message.answer(f"🖥 Экран чекина: {state}\n{_screen_url(settings)}\nДашборд: {_dashboard_url(settings)}")
+    await message.answer(
+        f"🖥 Экран чекина: {state}\n"
+        "Открой на ноутбуке у входа и разверни на весь экран (F11). Ссылки ниже — не публикуй их: "
+        "с экраном QR можно отметиться из любой точки.\n\n"
+        f"Экран: {_screen_url(settings)}\nДашборд: {_dashboard_url(settings)}",
+        reply_markup=screen_links_keyboard(settings),
+    )
+
+
+def screen_links_keyboard(settings: Settings) -> InlineKeyboardMarkup | None:
+    """Кнопки «открыть экран QR» и «открыть дашборд» — ссылка с ключом, копировать ничего не нужно."""
+    row = []
+    if settings.webhook_base_url and settings.screen_secret:
+        row.append(InlineKeyboardButton(text="🖥 Открыть экран QR", url=_screen_url(settings)))
+    if settings.webhook_base_url and settings.dashboard_secret:
+        row.append(InlineKeyboardButton(text="📊 Дашборд", url=_dashboard_url(settings)))
+    return InlineKeyboardMarkup(inline_keyboard=[row]) if row else None
 
 
 def _screen_url(settings: Settings) -> str:

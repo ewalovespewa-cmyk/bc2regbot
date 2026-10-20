@@ -70,6 +70,9 @@ async def test_export_sends_csv(session):
     msg = _message(with_file=False)
     await admin_import.cmd_export(msg, session, settings)
     file = msg.answer_document.await_args.args[0]
-    content = file.data.decode("utf-8-sig")
-    assert content.splitlines()[0].startswith("email,full_name,phone,team,invite_link")
-    assert "https://t.me/bc_bot?start=" in content
+    assert file.filename.endswith(".xlsx")
+    from app.services.sources import parse_xlsx
+
+    rows = parse_xlsx(file.data)  # первый лист — «Прошли»
+    assert rows[0]["Почта"] == "aru@mail.com"
+    assert rows[0]["Ссылка-приглашение"].startswith("https://t.me/bc_bot?start=")

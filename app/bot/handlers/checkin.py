@@ -27,6 +27,7 @@ from app.services.checkin import (
     manual_checkin,
     open_day,
     today_day,
+    upsert_day_from_text,
 )
 
 router = Router(name="checkin")
@@ -147,29 +148,13 @@ async def cmd_days(message: Message, session: AsyncSession, settings: Settings) 
 
 @router.message(Command("day"), RoleFilter(Role.SUPERADMIN))
 async def cmd_day(message: Message, command: CommandObject, session: AsyncSession, settings: Settings) -> None:
-    parts = (command.args or "").split(maxsplit=2)
     try:
-        tz = ZoneInfo(settings.timezone)
-        day_date = datetime.strptime(parts[0], "%d.%m").replace(year=datetime.now(tz).year).date()
-        start_s, end_s = parts[1].split("-")
-        opens = datetime.combine(day_date, time.fromisoformat(start_s), tz)
-        closes = datetime.combine(day_date, time.fromisoformat(end_s), tz)
-        if closes <= opens:
-            raise ValueError
-    except (ValueError, IndexError):
-        await message.answer("Формат: <code>/day 14.11 08:00-13:00 День 1</code>")
+        day = await upsert_day_from_text(session, settings, command.args or "")
+    except ValueError as exc:
+        await message.answer(f"{html.escape(str(exc))}\nНапример: <code>/day 14.11 08:00-13:00 День 1</code>")
         return
-    day = await session.scalar(select(EventDay).where(EventDay.date == day_date))
-    if day is None:
-        day = EventDay(date=day_date, label=parts[2] if len(parts) > 2 else f"{day_date:%d.%m}", checkin_opens_at=opens, checkin_closes_at=closes)
-        session.add(day)
-    else:
-        day.checkin_opens_at, day.checkin_closes_at = opens, closes
-        if len(parts) > 2:
-            day.label = parts[2]
-    await session.flush()
-    await log_admin_action(session, message.from_user.id, "day_set", day.date.isoformat(), window=parts[1])
-    await message.answer("✅ " + _fmt_day(day, tz))
+    await log_admin_action(session, message.from_user.id, "day_set", day.date.isoformat(), text=command.args)
+    await message.answer("✅ " + _fmt_day(day, ZoneInfo(settings.timezone)))
 
 
 @router.message(Command("checkin_open"), RoleFilter(Role.ADMIN))

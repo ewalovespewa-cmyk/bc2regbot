@@ -197,9 +197,21 @@ async def start_plain(
     participant: Participant | None,
     lang: str,
 ) -> None:
+    from app.bot.handlers.admin_ui import admin_reply_keyboard, show_main
+    from app.services.roles import get_role
+
+    role = await get_role(session, settings, message.from_user.id)
     if participant:
         await state.clear()
         await send_welcome(message, participant, settings, first_time=False)
+        if role:  # админ, который сам участник: меню участника + панель админа
+            await show_main(message, role, settings)
+        return
+    if role:
+        # Админ или волонтёр, не участник: сразу админка, номер не спрашиваем.
+        await state.clear()
+        await message.answer("Привет! Ты в команде бота Business Cup 🛠", reply_markup=admin_reply_keyboard())
+        await show_main(message, role, settings)
         return
     await link_or_ask_contact(message, state=state, session=session, bot=bot, redis=redis, settings=settings, lang=lang)
 

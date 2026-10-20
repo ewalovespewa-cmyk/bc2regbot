@@ -228,3 +228,67 @@ async def checkins_timeline(session: AsyncSession, day: EventDay, bucket_minutes
         key = ts.replace(minute=ts.minute - ts.minute % bucket_minutes, second=0, microsecond=0)
         buckets[key] = buckets.get(key, 0) + 1
     return [(k.isoformat(), v) for k, v in sorted(buckets.items())]
+
+
+# ---------------------------------------------------------------- сброс (для тестов)
+
+
+async def reset_checkins(session: AsyncSession, day_id: int | None = None) -> int:
+    """Удаляет отметки (одного дня или все). Бот игр получает checkin.cancelled по каждой —
+    у тестировщиков снова закроется бинго. Возвращает, сколько отметок удалено."""
+    stmt = select(Checkin, Participant, EventDay).join(Participant, Participant.id == Checkin.participant_id).join(
+        EventDay, EventDay.id == Checkin.event_day_id
+    )
+    if day_id is not None:
+        stmt = stmt.where(Checkin.event_day_id == day_id)
+    rows = (await session.execute(stmt)).all()
+    for checkin, participant, day in rows:
+        outbox.enqueue(
+            session,
+            outbox.CHECKIN_CANCELLED,
+            {"telegram_user_id": participant.telegram_user_id, "participant_id": participant.id, "day": day.date.isoformat()},
+        )
+        await session.delete(checkin)
+    await session.flush()
+    return len(rows)
+
+
+async def delete_day(session: AsyncSession, day: EventDay) -> int:
+    """Удаляет день (например, тестовый) вместе с его отметками. Возвращает число удалённых отметок."""
+    removed = await reset_checkins(session, day.id)
+    await session.delete(day)
+    await session.flush()
+    return removed
+
+
+async def checkins_count(session: AsyncSession, day_id: int | None = None) -> int:
+    stmt = select(func.count()).select_from(Checkin)
+    if day_id is not None:
+        stmt = stmt.where(Checkin.event_day_id == day_id)
+    return await session.scalar(stmt) or 0
+
+
+async def upsert_day_from_text(session: AsyncSession, settings: Settings, text: str) -> EventDay:
+    """«14.11 08:00-13:00 День 1» → создать день или поправить окно и название. ValueError, если формат не тот."""
+    parts = (text or "").split(maxsplit=2)
+    tz = ZoneInfo(settings.timezone)
+    try:
+        day_date = datetime.strptime(parts[0], "%d.%m").replace(year=datetime.now(tz).year).date()
+        start_s, end_s = parts[1].split("-")
+        opens = datetime.combine(day_date, time.fromisoformat(start_s.strip()), tz)
+        closes = datetime.combine(day_date, time.fromisoformat(end_s.strip()), tz)
+    except (ValueError, IndexError) as exc:
+        raise ValueError("Формат: 14.11 08:00-13:00 День 1") from exc
+    if closes <= opens:
+        raise ValueError("Конец окна должен быть позже начала")
+    day = await session.scalar(select(EventDay).where(EventDay.date == day_date))
+    if day is None:
+        label = parts[2] if len(parts) > 2 else f"{day_date:%d.%m}"
+        day = EventDay(date=day_date, label=label, checkin_opens_at=opens, checkin_closes_at=closes)
+        session.add(day)
+    else:
+        day.checkin_opens_at, day.checkin_closes_at = opens, closes
+        if len(parts) > 2:
+            day.label = parts[2]
+    await session.flush()
+    return day

@@ -53,6 +53,34 @@ def parse_csv(data: bytes) -> list[Row]:
     return rows
 
 
+def parse_xlsx(data: bytes, sheet: str | None = None) -> list[Row]:
+    """Excel-файл (.xlsx): берётся лист с нужным именем или первый. Первая строка — заголовок."""
+    from openpyxl import load_workbook
+
+    try:
+        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception as exc:
+        raise ValueError(f"Не удалось открыть Excel-файл: {exc}") from exc
+    ws = wb[sheet] if sheet and sheet in wb.sheetnames else wb.worksheets[0]
+    values = [["" if v is None else str(v).strip() for v in row] for row in ws.iter_rows(values_only=True)]
+    if not values:
+        return []
+    header = values[0]
+    rows = []
+    for line in values[1:]:
+        row = {h: v for h, v in zip(header, line) if h}
+        if any(row.values()):
+            rows.append(row)
+    return rows
+
+
+def parse_table_file(data: bytes, filename: str | None) -> list[Row]:
+    """CSV или XLSX — по расширению файла (или по сигнатуре zip у xlsx)."""
+    if (filename or "").lower().endswith((".xlsx", ".xlsm")) or data[:2] == b"PK":
+        return parse_xlsx(data)
+    return parse_csv(data)
+
+
 def rows_to_csv(header: list[str], rows: list[list[Any]]) -> bytes:
     buf = io.StringIO()
     writer = csv.writer(buf)
@@ -124,6 +152,11 @@ class SheetsClient:
             return rows
 
         return await self._call(fetch, f"прочитать лист «{worksheet or 'первый'}»")
+
+    async def write_tables(self, tables: list[Any]) -> None:
+        """Перезаписывает несколько листов (объекты с полями name, header, rows) — по одному пакету на лист."""
+        for table in tables:
+            await self.write_table(table.name, table.header, table.rows)
 
     async def write_table(self, worksheet: str, header: list[str], rows: list[list[Any]]) -> None:
         """Полностью перезаписывает лист одним пакетом (создаёт лист, если его нет)."""

@@ -56,14 +56,17 @@ class Settings(BaseSettings):
     # Содержимое JSON-ключа сервис-аккаунта целиком (или base64 от него).
     google_service_account_json: str = ""
     sheet_applications_worksheet: str = ""  # пусто → первый лист
-    sheet_status_worksheet: str = "bot_status"
+    sheet_status_worksheet: str = "Прошли"  # + вкладки «Чекин <день>» на каждый день
     sheet_teams_worksheet: str = ""  # лист "team_name, email"; пусто → не читаем
-    # Поле участника → название колонки в таблице. Незаданные поля берутся из DEFAULT_COLUMN_MAP.
+    # Поле участника → название колонки, если оно не из стандартных (см. DEFAULT_COLUMN_ALIASES в importer.py).
     sheet_column_map: dict[str, str] = {}
     sheet_selected_column: str = "Selected"
-    sheet_selected_values: Annotated[frozenset[str], NoDecode] = frozenset({"yes", "да", "1", "true", "+", "✅"})
+    sheet_selected_values: Annotated[frozenset[str], NoDecode] = frozenset(
+        {"yes", "да", "1", "true", "+", "✅", "selected", "accepted", "approved",
+         "прошел", "прошла", "прошли", "принят", "принята", "одобрен", "одобрена", "отобран", "отобрана"}
+    )
     sheet_team_column: str = "Team"
-    sheet_sync_minutes: int = 10
+    sheet_sync_minutes: int = 2
     auto_import_minutes: int = 30
     sheets_timeout_seconds: int = 30
 

@@ -12,6 +12,7 @@ from app.bot.handlers import (
     admin_content,
     admin_import,
     admin_panel,
+    admin_ui,
     checkin,
     menu,
     polls,
@@ -61,6 +62,7 @@ def create_dispatcher(
         errors.router,
         service.router,
         admin_import.router,
+        admin_ui.router,  # после /import: файл без команды ловит admin_ui
         admin_panel.router,
         admin_content.router,
         admin_broadcast.router,

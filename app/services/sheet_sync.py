@@ -2,7 +2,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.services.exports import bot_status_table
+from app.services.exports import all_tables
 from app.services.importer import ImportReport, TeamsReport, assign_teams, import_applications
 from app.services.sources import Row, SheetsClient
 
@@ -31,9 +31,10 @@ async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[
 
 
 async def push_status_to_sheet(session: AsyncSession, settings: Settings) -> int:
-    header, rows = await bot_status_table(session, settings.bot_username, settings.timezone)
-    await SheetsClient(settings).write_table(settings.sheet_status_worksheet, header, rows)
-    return len(rows)
+    """Пишет вкладки «Прошли» и «Чекин <день>» в Google Sheet. Возвращает число отобранных."""
+    tables = await all_tables(session, settings.bot_username, settings.timezone, settings.sheet_status_worksheet)
+    await SheetsClient(settings).write_tables(tables)
+    return len(tables[0].rows)
 
 
 def format_import_report(report: ImportReport) -> str:
@@ -44,6 +45,8 @@ def format_import_report(report: ImportReport) -> str:
         f"Обновлено: {report.updated}, без изменений: {report.unchanged}",
         f"Не отобраны (пропущены): {report.not_selected}",
     ]
+    if report.duplicates:
+        lines.append(f"Повторных заявок (взята последняя): {report.duplicates}")
     if report.deselected:
         lines.append(f"⚠️ Сняты с отбора: {report.deselected} (бот перестанет их пускать)")
     if report.teams_created:

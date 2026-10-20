@@ -13,7 +13,7 @@ from app.bot.filters import RoleFilter
 from app.config import Settings
 from app.db.models import Role
 from app.services.audit import log_admin_action
-from app.services.exports import bot_status_table
+from app.services.exports import all_tables, tables_to_xlsx
 from app.services.importer import ImportAborted, assign_teams
 from app.services.sheet_sync import (
     format_import_report,
@@ -23,7 +23,7 @@ from app.services.sheet_sync import (
     push_status_to_sheet,
 )
 from app.services.settings_store import AUTO_IMPORT_ENABLED, get_setting, set_setting
-from app.services.sources import SheetsError, parse_csv, rows_to_csv
+from app.services.sources import SheetsError, parse_table_file
 
 router = Router(name="admin_import")
 router.message.filter(F.chat.type == "private")
@@ -50,7 +50,7 @@ async def _read_csv(bot: Bot, document: Document) -> list[dict[str, str]]:
     buf = io.BytesIO()
     await bot.download(document, destination=buf, timeout=60)
     try:
-        return parse_csv(buf.getvalue())
+        return parse_table_file(buf.getvalue(), document.file_name)
     except ValueError as exc:
         raise ImportAborted(str(exc)) from exc
 
@@ -120,13 +120,14 @@ async def cmd_import_teams(message: Message, bot: Bot, session: AsyncSession, se
 
 @router.message(Command("export"), RoleFilter(Role.ADMIN))
 async def cmd_export(message: Message, session: AsyncSession, settings: Settings) -> None:
-    header, rows = await bot_status_table(session, settings.bot_username, settings.timezone)
+    tables = await all_tables(session, settings.bot_username, settings.timezone, settings.sheet_status_worksheet)
     stamp = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     await message.answer_document(
-        BufferedInputFile(rows_to_csv(header, rows), filename=f"bot_status_{stamp}.csv"),
-        caption=f"📤 Участников: {len(rows)}. Колонка invite_link — персональные ссылки для письма.",
+        BufferedInputFile(tables_to_xlsx(tables), filename=f"business_cup_{stamp}.xlsx"),
+        caption=f"📤 Участников: {len(tables[0].rows)}. Листы по дням чекина — внутри. "
+        "Колонка «Ссылка-приглашение» — для писем.",
     )
-    await log_admin_action(session, message.from_user.id, "export", rows=len(rows))
+    await log_admin_action(session, message.from_user.id, "export", rows=len(tables[0].rows))
 
 
 @router.message(Command("sync"), RoleFilter(Role.ADMIN))

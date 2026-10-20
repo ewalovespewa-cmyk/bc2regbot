@@ -13,22 +13,30 @@ from app.services.normalize import normalize_email, normalize_phone, normalize_u
 from app.services.sources import Row
 from app.services.tokens import generate_invite_token
 
-# Поле участника → колонка формы businesscup.zimran.io/en/apply. Переопределяется SHEET_COLUMN_MAP.
-DEFAULT_COLUMN_MAP: dict[str, str] = {
-    "participation_type": "Participation type",
-    "full_name": "Full name",
-    "email": "Email",
-    "phone": "Phone",
-    "tg_username_form": "Telegram username",
-    "linkedin": "LinkedIn or CV link",
-    "university": "University",
-    "year_of_study": "Year of study",
-    "major": "Major",
-    "zimran_interest": "Interested in a career at Zimran",
-    "career_interest": "Career interest",
-    "aiesec_project": "What AIESEC project have you participated in before?",
+# Поле участника → возможные названия колонки (без учёта регистра). Первое найденное — используется.
+# Покрывает и форму businesscup.zimran.io/en/apply, и таблицу «Business Cup 2.0 — кандидаты».
+# SHEET_COLUMN_MAP задаёт свою колонку для поля — она проверяется первой.
+DEFAULT_COLUMN_ALIASES: dict[str, tuple[str, ...]] = {
+    "participation_type": ("Participation type",),
+    "full_name": ("Full name", "Имя", "ФИО", "Name"),
+    "email": ("Email", "Почта", "E-mail"),
+    "phone": ("Phone", "Phone number", "Телефон"),
+    "tg_username_form": ("Telegram username", "Telegram", "Телеграм"),
+    "linkedin": ("LinkedIn or CV link", "LinkedIn / CV", "LinkedIn"),
+    "university": ("University", "Университет"),
+    "year_of_study": ("Year of study", "Курс"),
+    "major": ("Major", "Специальность"),
+    "zimran_interest": ("Interested in a career at Zimran",),
+    "career_interest": ("Career interest", "Career interests"),
+    "aiesec_project": ("What AIESEC project have you participated in before?", "Previous AIESEC project"),
+    "team_role": ("Position in team", "Роль в команде"),
+    "application_id": ("ID заявки", "Application ID"),
 }
+SELECTED_COLUMN_ALIASES = ("Selected", "Состояние", "Статус", "Status", "Отбор")
+TEAM_COLUMN_ALIASES = ("Team", "Team name", "Команда")
 TEXT_FIELDS = (
+    "team_role",
+    "application_id",
     "participation_type",
     "linkedin",
     "university",
@@ -55,6 +63,7 @@ class ImportReport:
     not_selected: int = 0
     deselected: int = 0
     teams_created: int = 0
+    duplicates: int = 0  # повторные заявки того же email (взята последняя)
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
@@ -100,6 +109,23 @@ class _Columns:
         return None
 
 
+def _norm_status(value: str) -> str:
+    return " ".join(value.strip().lower().replace("ё", "е").split())
+
+
+def is_selected_value(value: str, selected_values: frozenset[str]) -> bool:
+    """«Прошёл отбор», «прошел», «Accepted ✅» — считаем отобранным, если значение равно одному из
+    SHEET_SELECTED_VALUES или начинается с него («прошел отбор» ← «прошел»)."""
+    status = _norm_status(value)
+    if not status:
+        return False
+    for v in selected_values:
+        v = _norm_status(v)
+        if v and (status == v or status.startswith(v + " ")):
+            return True
+    return False
+
+
 def _add_error(report_errors: list[str], message: str) -> None:
     if len(report_errors) < MAX_ERRORS_IN_REPORT:
         report_errors.append(message)
@@ -140,38 +166,41 @@ async def import_applications(
     assume_selected: bool = False,
 ) -> ImportReport:
     """Записывает отобранных в БД. Коммит делает вызывающий код."""
-    mapping = {**DEFAULT_COLUMN_MAP, **(column_map or {})}
+    overrides = column_map or {}
     cols = _Columns(rows)
-    resolved = {f: cols.find(header) for f, header in mapping.items()}
+    resolved = {
+        f: cols.find(*([overrides[f]] if f in overrides else []), *aliases) for f, aliases in DEFAULT_COLUMN_ALIASES.items()
+    }
     if not resolved["email"]:
-        raise ImportAborted(f"В таблице нет колонки «{mapping['email']}» (email). Проверь SHEET_COLUMN_MAP.")
+        raise ImportAborted("В таблице нет колонки с email («Email» или «Почта»). Проверь SHEET_COLUMN_MAP.")
     if not resolved["full_name"]:
-        raise ImportAborted(f"В таблице нет колонки «{mapping['full_name']}» (имя). Проверь SHEET_COLUMN_MAP.")
-    sel_col = cols.find(selected_column)
+        raise ImportAborted("В таблице нет колонки с именем («Full name» или «Имя»). Проверь SHEET_COLUMN_MAP.")
+    sel_col = cols.find(selected_column, *SELECTED_COLUMN_ALIASES)
     if not sel_col and not assume_selected:
         raise ImportAborted(
-            f"В таблице нет колонки отбора «{selected_column}». Добавь её или импортируй командой "
-            "«/import all», если в файле только отобранные."
+            f"В таблице нет колонки отбора («{selected_column}» или «Состояние»). Добавь её или импортируй "
+            "кнопкой «Импортировать всех из файла», если в файле только отобранные."
         )
-    team_col = cols.find(team_column)
+    team_col = cols.find(team_column, *TEAM_COLUMN_ALIASES)
 
     report = ImportReport(rows=len(rows))
     existing = {p.email: p for p in (await session.scalars(select(Participant))).all()}
     taken_tokens = set((await session.scalars(select(Participant.invite_token))).all())
     teams = await _teams_by_name(session)
-    seen: dict[str, int] = {}
-
+    # Человек мог подать заявку несколько раз — берём последнюю строку с его email.
+    latest: dict[str, tuple[int, Row]] = {}
     for line_no, row in enumerate(rows, start=2):  # строка 1 — заголовок
         email = normalize_email(row.get(resolved["email"], ""))
         if not email:
             _add_error(report.errors, f"строка {line_no}: нет корректного email")
             continue
-        if email in seen:
-            report.warnings.append(f"строка {line_no}: {email} уже был в строке {seen[email]}, берём последнюю")
-        seen[email] = line_no
+        if email in latest:
+            report.duplicates += 1
+        latest[email] = (line_no, row)
 
+    for email, (line_no, row) in latest.items():
         participant = existing.get(email)
-        selected = assume_selected or row.get(sel_col, "").strip().lower() in selected_values
+        selected = assume_selected or is_selected_value(row.get(sel_col, ""), selected_values)
         if not selected:
             report.not_selected += 1
             if participant and participant.is_selected:

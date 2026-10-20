@@ -36,63 +36,10 @@ def _btn(text: str, data: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, callback_data=data)
 
 
-def admin_menu_keyboard(role: Role, settings: Settings | None = None) -> InlineKeyboardMarkup:
-    rows = [[_btn("🔎 Найти участника", "adm:find")]]
-    if settings is not None and has_role(role, Role.ADMIN):
-        from app.bot.handlers.checkin import screen_links_keyboard
-
-        if links := screen_links_keyboard(settings):
-            rows.append(links.inline_keyboard[0])
-    if has_role(role, Role.ADMIN):
-        rows.append([_btn("📊 Статистика", "adm:stats"), _btn("✅ Чекин: дни и экран", "adm:days")])
-    if has_role(role, Role.ADMIN):
-        rows.append([_btn("📤 Выгрузка CSV", "adm:export"), _btn("🔄 В Google Sheet", "adm:sync")])
-        rows.append([_btn("📣 Рассылка", "adm:broadcast"), _btn("📋 Опрос явки", "adm:poll")])
-        rows.append([_btn("📝 Контент", "adm:content"), _btn("📞 Обзвон", "adm:calls")])
-    if has_role(role, Role.SUPERADMIN):
-        rows.append([_btn("📥 Импорт", "adm:import"), _btn("👥 Админы", "adm:admins")])
-        rows.append([_btn("🧾 Журнал действий", "adm:audit"), _btn("🚨 Подозрительное", "adm:suspicious")])
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-
-# ---------------------------------------------------------------- /admin
-
-
-@router.message(Command("admin"), RoleFilter(Role.VOLUNTEER))
-async def cmd_admin(message: Message, bot: Bot, role: Role, settings: Settings) -> None:
-    await apply_admin_commands(bot, message.from_user.id, role)  # заодно обновим подсказки команд
-    await message.answer(
-        f"🛠 <b>Админ-меню</b> · роль: {ROLE_TITLES[role]}", reply_markup=admin_menu_keyboard(role, settings)
-    )
-
-
 @router.callback_query(F.data == "adm:find", RoleFilter(Role.VOLUNTEER))
 async def on_find_button(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(FindStates.waiting_query)
     await callback.message.answer("Кого ищем? Фамилия, имя, телефон, email, @username или команда.")
-    await callback.answer()
-
-
-@router.callback_query(F.data == "adm:import", RoleFilter(Role.SUPERADMIN))
-async def on_import_button(callback: CallbackQuery, settings: Settings) -> None:
-    source = "Google Sheet подключён: просто отправь /import." if settings.sheets_enabled else "Google Sheet не подключён."
-    await callback.message.answer(
-        f"📥 <b>Импорт участников</b>\n{source}\n\n"
-        "Из файла: пришли CSV с подписью <code>/import</code> "
-        "(или <code>/import all</code>, если в файле только отобранные).\n"
-        "Команды отдельным файлом: CSV <code>team_name,email</code> с подписью <code>/import_teams</code>."
-    )
-    await callback.answer()
-
-
-@router.callback_query(
-    F.data.in_({"adm:export", "adm:sync", "adm:content", "adm:admins", "adm:audit", "adm:broadcast", "adm:poll",
-                "adm:calls", "adm:stats", "adm:days", "adm:suspicious"})
-)
-async def on_shortcut(callback: CallbackQuery) -> None:
-    """Кнопки-ярлыки: подсказываем команду, сами команды проверяют роль."""
-    command = callback.data.split(":")[1]
-    await callback.message.answer(f"Отправь /{command}")
     await callback.answer()
 
 

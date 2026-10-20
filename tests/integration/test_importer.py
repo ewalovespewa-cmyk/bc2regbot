@@ -131,9 +131,9 @@ async def test_bad_rows_reported_not_fatal(session):
 async def test_bot_status_table(session):
     await run(session, parse_csv(CSV.encode()))
     header, rows = await bot_status_table(session, "bc_bot", "Asia/Almaty")
-    assert header[:6] == ["email", "full_name", "phone", "team", "invite_link", "bot_started"]
-    by_email = {r[0]: r for r in rows}
+    col = {h: i for i, h in enumerate(header)}
+    by_email = {r[col["Почта"]]: r for r in rows}
     assert set(by_email) == {"aru@mail.com", "dana@mail.com", "timur@mail.com"}
-    assert by_email["timur@mail.com"][3] == "Соло"
-    assert by_email["aru@mail.com"][4].startswith("https://t.me/bc_bot?start=")
-    assert by_email["aru@mail.com"][5] == "нет"
+    assert by_email["timur@mail.com"][col["Команда"]] == "Соло"
+    assert by_email["aru@mail.com"][col["Ссылка-приглашение"]].startswith("https://t.me/bc_bot?start=")
+    assert by_email["aru@mail.com"][col["Открыл бота"]] == "нет"

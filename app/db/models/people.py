@@ -36,6 +36,8 @@ class Participant(Base):
     phone: Mapped[str | None] = mapped_column(String(32), index=True)  # E.164
     phone_raw: Mapped[str | None] = mapped_column(String(64))
     tg_username_form: Mapped[str | None] = mapped_column(String(64), index=True)  # без @, lowercase
+    team_role: Mapped[str | None] = mapped_column(Text)  # Captain / Team member
+    application_id: Mapped[str | None] = mapped_column(String(64))  # «ID заявки» из таблицы
     participation_type: Mapped[str | None] = mapped_column(Text)
     university: Mapped[str | None] = mapped_column(Text)
     year_of_study: Mapped[str | None] = mapped_column(Text)

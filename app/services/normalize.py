@@ -2,7 +2,7 @@
 import re
 
 _NON_DIGITS = re.compile(r"\D")
-_USERNAME = re.compile(r"^[a-z0-9_]{4,32}$")
+_USERNAME = re.compile(r"^[a-z][a-z0-9_]{3,31}$")  # username в Telegram начинается с буквы
 
 
 def normalize_phone(raw: str | None) -> str | None:

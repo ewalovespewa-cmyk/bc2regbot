@@ -35,10 +35,12 @@ ATTENDANCE_OPTIONS = [
     ("maybe", "Пока не знаю 🤔", "Not sure yet 🤔", False, True),
 ]
 DEFAULT_ATTENDANCE_QUESTION = (
-    "Business Cup 2.0 уже совсем скоро: 14–15 ноября, Nazarbayev University, Астана.\n\n<b>Ты придёшь?</b>"
+    "⏳ <b>Business Cup 2.0 уже совсем скоро!</b>\n\n"
+    "📍 <b>Venue:</b> Nazarbayev University\n🗓 <b>Date:</b> 14–15 ноября\n\n<b>Ты придёшь?</b>"
 )
 DEFAULT_ATTENDANCE_QUESTION_EN = (
-    "Business Cup 2.0 is almost here: November 14–15, Nazarbayev University, Astana.\n\n<b>Are you coming?</b>"
+    "⏳ <b>Business Cup 2.0 is almost here!</b>\n\n"
+    "📍 <b>Venue:</b> Nazarbayev University\n🗓 <b>Date:</b> November 14–15\n\n<b>Are you coming?</b>"
 )
 
 

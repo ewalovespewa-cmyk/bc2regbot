@@ -319,3 +319,18 @@ async def test_menu_button_is_not_taken_as_reason(h, session):
     await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
     await h.text(p0, "Экзамен")  # обычный текст по-прежнему записывается
     assert await reason() == "Экзамен"
+
+
+async def test_attendance_replies(h, session):
+    p0 = 2000
+    await h.text(SUPER, "/poll start")
+    poll = await polls.latest_attendance_poll(session)
+    poll_id, yes_id, no_id = poll.id, poll.options[0].id, poll.options[1].id
+
+    await h.callback(p0, p0, f"pl:{poll_id}:{yes_id}")
+    assert h.session.last_text(p0) == "Отлично, будем вас ждать! До скорой встречи💙"
+
+    await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
+    assert h.session.last_text(p0).startswith("Очень жаль😔") and "Напишите одним сообщением." in h.session.last_text(p0)
+    await h.text(p0, "Экзамен")
+    assert h.session.last_text(p0).startswith("Спасибо, до скорой встречи!") and "отметиться заново" in h.session.last_text(p0)

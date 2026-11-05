@@ -10,8 +10,6 @@ start:
     🗓 <b>Date:</b> November 14–15
 
     If you still haven't joined our <a href="{channel}">Telegram channel</a>, we <b>strongly recommend</b> it. All the main news will be there!
-
-    #FromZeroToProductIn24h with AIESEC
   welcome_menu: |-
     <b>What's waiting for you in this bot?</b>
 
@@ -23,7 +21,7 @@ start:
 
     It's all in the menu below 👇
   welcome_team: "👥 <b>Team:</b> {team}"
-  welcome_solo: "🙋 <b>Team:</b> solo for now, you can team up on site"
+  welcome_solo: "🙋 <b>Team:</b> Solo for now. We'll team you up, stay tuned!"
   channel_button: "📣 Join the channel"
   welcome_back: "👋 Welcome back, {name}! It's all in the menu below."
   games_hint: "🎮 <b>While you wait</b>, jump into the games: the photo hunt and the expedition are already open!"
@@ -91,9 +89,13 @@ poll:
   not_participant: "🔒 This poll is for participants only. Tap /start to get in."
   closed: "⌛ The poll is closed, we're no longer taking answers."
   saved: "✅ Saved: {answer}. You can change it until the deadline."
-  ask_reason: "Sorry to hear that 😔 Could you tell us what's in the way? Write one message or skip."
+  coming: "Great, we'll be waiting for you! See you soon💙"
+  ask_reason: |-
+    So sorry to hear that😔 Could you tell us why you can't make it?
+
+    Please send it in one message.
   skip: "Skip"
-  reason_thanks: "Thanks, noted 🙏"
+  reason_thanks: "Thanks, see you soon!🙌🏽 If you change your mind, you can just answer again. We'll be waiting!"
   reason_skipped: "OK, no reason 👌"
 
 checkin:

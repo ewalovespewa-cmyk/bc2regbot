@@ -55,7 +55,9 @@ async def on_answer(
 
     await poll_service.record_answer(session, poll, participant, option)
     label = poll_service.option_label(option, participant.lang)
-    await callback.answer(t("poll.saved", participant.lang, answer=label))
+    # На «Приду» и «Не смогу» ниже уходит сообщение, всплывашка нужна только остальным вариантам.
+    coming = option.code == "yes"
+    await callback.answer(None if coming or option.asks_reason else t("poll.saved", participant.lang, answer=label))
     try:
         # Кнопки остаются: ответ можно поменять до дедлайна. Отмечаем выбранный вариант.
         rows = [
@@ -67,6 +69,8 @@ async def on_answer(
         pass
     if not option.asks_reason:
         await state.clear()  # передумал после «Не смогу»: следующее сообщение уже не причина
+        if coming:
+            await callback.message.answer(t("poll.coming", participant.lang))
     else:
         await state.set_state(PollStates.reason)
         await state.update_data(poll_id=poll.id)

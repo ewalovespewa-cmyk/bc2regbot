@@ -188,3 +188,12 @@ async def test_account_held_by_deselected_record_moves_to_active_one(h, session)
     assert (await participant(session, "anton@mail.com")).telegram_user_id == STRANGER
     assert (await participant(session, "gone@mail.com")).telegram_user_id is None
     assert "Антон" in h.session.texts(STRANGER)[0]  # приветствие, номер не спрашивали
+
+
+def test_first_message_wording():
+    from app.i18n import t
+
+    solo = t("start.welcome_solo", "en")
+    assert "team you up" in solo and "stay tuned" in solo and "on site" not in solo
+    text = t("start.welcome", "en", name="Amira", team_line=solo, channel="https://t.me/business_cup_2026")
+    assert text.endswith("All the main news will be there!")

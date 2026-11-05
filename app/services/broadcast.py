@@ -39,6 +39,7 @@ from app.db.models import (
     DeliveryStatus,
     MediaType,
     Participant,
+    Poll,
 )
 from app.logs import get_logger
 from app.services import segments
@@ -139,6 +140,15 @@ async def test_recipients(session: AsyncSession, settings: Settings) -> list[int
     return sorted(set(settings.superadmin_ids) | set(admins))
 
 
+NEXT_BROADCAST = "next_broadcast_id"  # ключ в stats: какую рассылку запустить, когда эта закончится
+
+
+async def _followup(session: AsyncSession, b: Broadcast) -> Broadcast | None:
+    next_id = (b.stats or {}).get(NEXT_BROADCAST)
+    followup = await session.get(Broadcast, next_id) if next_id else None
+    return followup if followup is not None and followup.status == BroadcastStatus.DRAFT else None
+
+
 async def start_broadcast(session: AsyncSession, b: Broadcast, settings: Settings) -> int:
     """Замораживает получателей и переводит рассылку в running. Возвращает число получателей."""
     if b.status not in (BroadcastStatus.DRAFT, BroadcastStatus.SCHEDULED):
@@ -188,6 +198,12 @@ async def cancel_broadcast(session: AsyncSession, b: Broadcast) -> bool:
     b.status = BroadcastStatus.CANCELLED
     b.finished_at = datetime.now(UTC)
     b.stats = {**(b.stats or {}), **await delivery_stats(session, b.id)}
+    if followup := await _followup(session, b):
+        # Анонс остановили — опрос без него тоже не уходит, его можно запустить заново.
+        followup.status = BroadcastStatus.CANCELLED
+        followup.finished_at = b.finished_at
+        if poll := await session.get(Poll, followup.poll_id):
+            poll.is_active = False
     await session.flush()
     return True
 
@@ -383,6 +399,8 @@ async def run_worker_cycle(bot: Bot, sm: async_sessionmaker[AsyncSession], setti
             processed += await process_batch(bot, sm, broadcast_id)
             async with sm() as session:
                 finished = await finish_if_complete(session, broadcast_id)
+                if finished and (followup := await _followup(session, finished)):
+                    await start_broadcast(session, followup, settings)  # одной транзакцией с завершением
                 await session.commit()
             if finished:
                 await _send_report(bot, settings, finished)

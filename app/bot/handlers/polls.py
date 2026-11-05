@@ -136,7 +136,7 @@ async def cmd_poll(message: Message, command: CommandObject, session: AsyncSessi
         tz = ZoneInfo(settings.timezone)
         dl = f"до {deadline.astimezone(tz):%d.%m %H:%M}" if deadline else "без дедлайна"
         await message.answer(
-            f"📋 Опрос #{poll.id} запущен ({dl}), рассылка #{b.id}: {b.stats.get('total', 0)} получателей.\n"
+            f"📋 Опрос #{poll.id} запущен ({dl}): сначала анонс #{b.id}, сразу за ним опрос, {b.stats.get('total', 0)} получателей.\n"
             f"Напоминание не ответившим и «не знаю»: через {hours} ч, раз: {reminders}."
         )
         return

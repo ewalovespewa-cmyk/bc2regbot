@@ -65,6 +65,23 @@ async def poll_keyboard_rows(session: AsyncSession, poll_id: int, lang: str) -> 
     return [[option_button(o, lang, f"pl:{poll.id}:{o.id}")] for o in poll.options]
 
 
+# Анонс, который уходит всем сразу перед опросом явки.
+ATTENDANCE_INTRO = """🎮 <b>Не упусти шанс выиграть 5 000 000 тенге на Business Cup 2.0!</b>
+
+24 часа работы над IT-продуктом вместе с командой. И это не только код и дедлайны. AIESEC позаботились о том, чтобы твой опыт был незабываемым!
+
+☕️ кофе-брейки, чтобы перезарядиться и обсудить идеи
+🏓 коворкинг-зоны для спокойной работы
+📸 фотобудка и геймификация, чтобы осталась память о хакатоне
+🎁 мерчпак на память
+🤝 нетворкинг и знакомства, из которых может вырасти что-то большее
+
+За эти два дня ты поработаешь над реальным кейсом, найдёшь своих людей и попадёшь в комьюнити, которое не заканчивается вместе с хакатоном.
+
+📍 Nazarbayev University
+🗓 14–15 ноября"""
+
+
 async def create_attendance_poll(
     session: AsyncSession,
     *,
@@ -100,23 +117,37 @@ async def create_attendance_poll(
 
 
 async def launch_poll(session: AsyncSession, poll: Poll, settings: Settings, *, segment: dict | None = None) -> Broadcast:
-    """Активирует опрос и создаёт рассылку с кнопками (запуск рассылки — start_broadcast)."""
-    from app.services.broadcast import start_broadcast
+    """Активирует опрос и запускает анонс. Рассылка с кнопками стартует, когда анонс разослан всем.
+
+    Возвращает рассылку анонса.
+    """
+    from app.services.broadcast import NEXT_BROADCAST, start_broadcast
 
     poll.is_active = True
     poll.started_at = datetime.now(UTC)
-    b = Broadcast(
+    segment = segment or {"type": segments.ALL}
+    question = Broadcast(
         title=f"Опрос #{poll.id}",
         text_html=poll.question_ru,
-        segment=segment or {"type": segments.ALL},
+        segment=segment,
         poll_id=poll.id,
         created_by=poll.created_by,
         status=BroadcastStatus.DRAFT,
     )
-    session.add(b)
+    session.add(question)
     await session.flush()
-    await start_broadcast(session, b, settings)
-    return b
+    intro = Broadcast(
+        title=f"Анонс перед опросом #{poll.id}",
+        text_html=ATTENDANCE_INTRO,
+        segment=segment,
+        stats={NEXT_BROADCAST: question.id},
+        created_by=poll.created_by,
+        status=BroadcastStatus.DRAFT,
+    )
+    session.add(intro)
+    await session.flush()
+    await start_broadcast(session, intro, settings)
+    return intro
 
 
 async def record_answer(

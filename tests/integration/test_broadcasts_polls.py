@@ -334,3 +334,32 @@ async def test_attendance_replies(h, session):
     assert h.session.last_text(p0).startswith("Очень жаль😔") and "Напишите одним сообщением." in h.session.last_text(p0)
     await h.text(p0, "Экзамен")
     assert h.session.last_text(p0).startswith("Спасибо, до скорой встречи!") and "отметиться заново" in h.session.last_text(p0)
+
+
+async def test_intro_goes_right_before_poll(h, session, settings, engine):
+    await h.text(SUPER, "/poll start")
+    poll_b = await session.scalar(select(Broadcast).where(Broadcast.poll_id.is_not(None)))
+    assert poll_b.status == BroadcastStatus.DRAFT  # пока анонс не разослан, опрос не стартует
+
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), settings, time_budget=10)
+    sent = [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000]
+    assert len(sent) == 2
+    assert sent[0].text == polls.ATTENDANCE_INTRO and sent[0].reply_markup is None
+    assert "Ты придёшь?" in sent[1].text and sent[1].reply_markup.inline_keyboard[0][0].text == "🟢 Приду"
+
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), settings, time_budget=10)
+    assert len([c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000]) == 2  # без дублей
+
+
+async def test_stopping_intro_stops_poll(h, session, settings, engine):
+    await h.text(SUPER, "/poll start")
+    intro = await session.scalar(select(Broadcast).where(Broadcast.title.like("Анонс%")))
+    assert await engine_mod.cancel_broadcast(session, intro)
+    await session.commit()
+
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), settings, time_budget=10)
+    session.expire_all()
+    assert not [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000]
+    poll_b = await session.scalar(select(Broadcast).where(Broadcast.poll_id.is_not(None)))
+    assert poll_b.status == BroadcastStatus.CANCELLED
+    assert (await polls.latest_attendance_poll(session)).is_active is False

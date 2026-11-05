@@ -573,7 +573,8 @@ async def on_poll_start_ask(callback: CallbackQuery, settings: Settings) -> None
     await _edit_or_send(
         callback,
         "▶️ Разослать всем привязанным участникам опрос «Ты придёшь?» с кнопками «Приду / Не смогу / Пока не знаю»?\n"
-        f"Тем, кто не ответил или ответил «не знаю», через 6 часов придёт одно напоминание.{test}",
+        "Перед опросом всем автоматически уйдёт анонс о Business Cup, опрос придёт сразу за ним.\n"
+        f"Тем, кто не ответил или ответил «Пока думаю», через 6 часов придёт одно напоминание.{test}",
         _kb([_btn("Да, запустить", "a:poll:startok"), _btn("Отмена", "m:comms")]),
     )
 
@@ -589,7 +590,7 @@ async def on_poll_start(callback: CallbackQuery, session: AsyncSession, settings
     await log_admin_action(session, callback.from_user.id, "poll_start", f"poll:{poll.id}", broadcast_id=b.id)
     await _edit_or_send(
         callback,
-        f"📋 Опрос #{poll.id} запущен: {b.stats.get('total', 0)} получателей. Сводка обновляется по кнопке.",
+        f"📋 Опрос #{poll.id} запущен: {b.stats.get('total', 0)} получателей. Сначала анонс, сразу за ним опрос. Сводка обновляется по кнопке.",
         _kb([_btn("📋 Сводка", "a:poll:summary")], [_btn("« Назад", "m:comms")]),
     )
 

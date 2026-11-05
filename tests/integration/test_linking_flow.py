@@ -194,6 +194,14 @@ def test_first_message_wording():
     from app.i18n import t
 
     solo = t("start.welcome_solo", "en")
-    assert "team you up" in solo and "stay tuned" in solo and "on site" not in solo
+    assert "Looking For Team" in solo and "team you up" in solo and "stay tuned" in solo and "on site" not in solo
     text = t("start.welcome", "en", name="Amira", team_line=solo, channel="https://t.me/business_cup_2026")
     assert text.endswith("All the main news will be there!")
+
+
+def test_participants_are_not_told_about_personal_links():
+    from pathlib import Path as P
+
+    for lang in ("ru", "en"):
+        text = (P("app/i18n") / f"{lang}.yaml").read_text(encoding="utf-8").lower()
+        assert "из письма" not in text and "ссылка уже" not in text and "from your email" not in text

@@ -38,7 +38,7 @@ from app.services.exports import all_tables, tables_to_xlsx
 from app.services.importer import ImportAborted, assign_teams
 from app.services.linking import linked_count, reset_links
 from app.services.roles import has_role
-from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, EVENT_LOCK, get_setting, set_setting
+from app.services.settings_store import AUTO_IMPORT_DEFAULT, ATTENDANCE_POLL_SENT, AUTO_IMPORT_ENABLED, EVENT_LOCK, get_setting, set_setting
 from app.services.sheet_sync import format_import_report, format_teams_report, import_from_sheet, import_rows, push_status_to_sheet
 from app.services.sources import SheetsError, parse_table_file
 
@@ -563,19 +563,27 @@ async def on_reset(callback: CallbackQuery, session: AsyncSession, settings: Set
 
 
 @router.callback_query(F.data == "m:comms", RoleFilter(Role.ADMIN))
-async def on_comms(callback: CallbackQuery, session: AsyncSession) -> None:
+async def on_comms(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
     poll = await poll_service.latest_attendance_poll(session)
+    planned = settings.attendance_poll_time
+    sent = await get_setting(session, ATTENDANCE_POLL_SENT, False)
     poll_line = "Опрос явки ещё не запускали." if poll is None else (
         f"Опрос явки #{poll.id}: {'идёт' if poll_service.is_open(poll) else 'закрыт'}."
     )
+    if planned:
+        poll_line += "\n✅ Анонс и опрос уже разосланы." if sent else (
+            f"\n🕒 Анонс и опрос уйдут автоматически {planned:%d.%m в %H:%M}, один раз, без напоминаний."
+        )
     rows = [
         [_btn("➕ Новая рассылка", "bc:new"), _btn("📄 Последние рассылки", "a:bc:list")],
         [_btn("📋 Сводка опроса", "a:poll:summary")],
     ]
     if poll is not None and poll_service.is_open(poll):
         rows.append([_btn("⏹ Закрыть опрос", "a:poll:close")])
-    else:
+    elif not planned:
         rows.append([_btn("▶️ Запустить опрос «Придёшь?»", "a:poll:start")])
+    if planned and not sent:
+        rows.append([_btn("🧪 Показать анонс и опрос только мне", "a:poll:test")])
     rows.append([_btn("📞 Список на обзвон", "pa:calls"), _btn("👥 Опрос по командам", "pa:teams")])
     rows.append(BACK)
     await _edit_or_send(callback, f"📣 <b>Рассылки и опрос</b>\n{poll_line}", _kb(*rows))
@@ -602,8 +610,21 @@ async def on_poll_summary(callback: CallbackQuery, session: AsyncSession) -> Non
     await callback.answer()
 
 
+@router.callback_query(F.data == "a:poll:test", RoleFilter(Role.ADMIN))
+async def on_poll_test(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    if await get_setting(session, ATTENDANCE_POLL_SENT, False):
+        await callback.answer("Настоящий опрос уже разослан, тест закрыл бы его.", show_alert=True)
+        return
+    b = await poll_service.launch_test_attendance_poll(session, settings, callback.from_user.id)
+    await log_admin_action(session, callback.from_user.id, "poll_test", f"broadcast:{b.id}")
+    await callback.answer("🧪 Сейчас придут анонс и опрос, только тебе.", show_alert=True)
+
+
 @router.callback_query(F.data == "a:poll:start", RoleFilter(Role.ADMIN))
 async def on_poll_start_ask(callback: CallbackQuery, settings: Settings) -> None:
+    if settings.attendance_poll_at:
+        await callback.answer(f"🕒 Опрос уходит автоматически ({settings.attendance_poll_at}, один раз).", show_alert=True)
+        return
     test = "\n🧪 TEST_MODE: опрос получат только админы." if settings.test_mode else ""
     await _edit_or_send(
         callback,
@@ -616,6 +637,9 @@ async def on_poll_start_ask(callback: CallbackQuery, settings: Settings) -> None
 
 @router.callback_query(F.data == "a:poll:startok", RoleFilter(Role.ADMIN))
 async def on_poll_start(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    if settings.attendance_poll_at:
+        await callback.answer(f"🕒 Опрос уходит автоматически ({settings.attendance_poll_at}, один раз).", show_alert=True)
+        return
     current = await poll_service.latest_attendance_poll(session)
     if current is not None and poll_service.is_open(current):
         await callback.answer("Опрос уже идёт", show_alert=True)

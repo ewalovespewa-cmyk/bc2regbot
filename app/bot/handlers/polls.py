@@ -116,6 +116,9 @@ async def cmd_poll(message: Message, command: CommandObject, session: AsyncSessi
     poll = await poll_service.latest_attendance_poll(session)
 
     if args and args[0] == "start":
+        if settings.attendance_poll_at:
+            await message.answer(f"🕒 Опрос уходит автоматически ({settings.attendance_poll_at}, один раз). Вручную запустить нельзя.")
+            return
         if poll and poll_service.is_open(poll):
             await message.answer("Опрос явки уже идёт. Сначала закрой его: <code>/poll close</code>")
             return

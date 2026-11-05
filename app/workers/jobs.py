@@ -1,5 +1,6 @@
 """Периодические задачи: рассылки, напоминания опросов, автоимпорт и bot_status в Google Sheet."""
 import html
+from datetime import UTC, datetime
 
 from app.logs import get_logger
 from app.services import broadcast, polls
@@ -94,6 +95,17 @@ async def poll_reminders(ctx: JobContext) -> None:
         await session.commit()
 
 
+async def scheduled_attendance_poll(ctx: JobContext) -> None:
+    at = ctx.settings.attendance_poll_time
+    if at is None or datetime.now(UTC) < at:
+        return
+    async with ctx.sessionmaker() as session:
+        b = await polls.launch_scheduled_attendance_poll(session, ctx.settings)
+        await session.commit()
+    if b:
+        log.info("attendance_poll_launched", broadcast_id=b.id, total=b.stats.get("total", 0))
+
+
 async def outbox(ctx: JobContext) -> None:
     import aiohttp
 
@@ -117,7 +129,9 @@ def all_jobs() -> list[Job]:
     sheets = lambda minutes: (lambda ctx: minutes(ctx) * 60 if ctx.settings.sheets_enabled else 0)  # noqa: E731
     jobs = [
         Job("broadcasts", broadcasts, lambda ctx: 2, timeout=120),
-        Job("poll_reminders", poll_reminders, lambda ctx: 60),
+        Job("attendance_poll", scheduled_attendance_poll, lambda ctx: 15 if ctx.settings.attendance_poll_at else 0),
+        # С опросом по расписанию напоминаний нет совсем, в том числе по старым тестовым опросам.
+        Job("poll_reminders", poll_reminders, lambda ctx: 0 if ctx.settings.attendance_poll_at else 60),
         Job("outbox", outbox, lambda ctx: 5 if ctx.settings.gamification_webhook_url else 0, timeout=120),
         # Google может отвечать минутами, поэтому таблица в своей группе и не задерживает рассылки.
         Job("auto_import", auto_import, sheets(lambda ctx: ctx.settings.auto_import_minutes), group="sheets"),

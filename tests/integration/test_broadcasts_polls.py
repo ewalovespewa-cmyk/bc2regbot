@@ -17,6 +17,7 @@ from app.db.models import (
     DeliveryStatus,
     EventDay,
     Participant,
+    Poll,
     PollAnswer,
     Role,
     Team,
@@ -363,3 +364,73 @@ async def test_stopping_intro_stops_poll(h, session, settings, engine):
     poll_b = await session.scalar(select(Broadcast).where(Broadcast.poll_id.is_not(None)))
     assert poll_b.status == BroadcastStatus.CANCELLED
     assert (await polls.latest_attendance_poll(session)).is_active is False
+
+
+def _scheduled(settings, at):
+    return settings.model_copy(update={"attendance_poll_at": at})
+
+
+def _ctx(h, redis, engine, settings):
+    from app.workers.runner import JobContext
+
+    return JobContext(h.bot, redis, create_sessionmaker(engine), settings)
+
+
+async def test_scheduled_poll_goes_once_with_intro_and_no_reminders(h, session, settings, engine, redis):
+    from app.workers import jobs
+
+    def sent_to_participant():
+        return [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000]
+
+    # Старый тестовый опрос ещё открыт.
+    old = await polls.create_attendance_poll(session, created_by=SUPER)
+    old.is_active = True
+    await session.commit()
+    old_id = old.id
+
+    future = _ctx(h, redis, engine, _scheduled(settings, "2099-11-13 12:00"))
+    await jobs.scheduled_attendance_poll(future)
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), settings, time_budget=10)
+    assert sent_to_participant() == []  # время не пришло
+
+    due = _scheduled(settings, "2026-01-01 12:00")
+    ctx = _ctx(h, redis, engine, due)
+    await jobs.scheduled_attendance_poll(ctx)
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), due, time_budget=10)
+    sent = sent_to_participant()
+    assert len(sent) == 2 and sent[0].text == polls.ATTENDANCE_INTRO and "Ты придёшь?" in sent[1].text
+
+    for _ in range(3):  # ни повторно, ни напоминанием
+        await jobs.scheduled_attendance_poll(ctx)
+        await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), due, time_budget=10)
+    assert len(sent_to_participant()) == 2
+
+    session.expire_all()
+    poll = await polls.latest_attendance_poll(session)
+    assert poll.id != old_id and polls.is_open(poll) and poll.max_reminders == 0
+    assert (await session.get(Poll, old_id)).is_active is False
+    assert await polls.due_reminders(session) == []
+
+    intervals = {job.name: job.interval(ctx) for job in jobs.all_jobs()}
+    assert intervals["poll_reminders"] == 0 and intervals["attendance_poll"] > 0
+
+
+async def test_manual_launch_closed_when_scheduled(engine, redis, world, settings, session):
+    scheduled = _scheduled(settings, "2099-11-13 12:00")
+    h = Harness(redis=redis, sessionmaker=create_sessionmaker(engine), settings=scheduled)
+    await h.text(SUPER, "/poll start")
+    assert "автоматически" in h.session.last_text(SUPER)
+    await h.callback(SUPER, SUPER, "a:poll:startok")
+    assert await polls.latest_attendance_poll(session) is None
+
+    await h.callback(SUPER, SUPER, "m:comms")
+    assert "13.11 в 12:00" in h.session.last_text(SUPER)
+
+    await h.callback(SUPER, SUPER, "a:poll:test")  # посмотреть можно, но только самому
+    session.expire_all()
+    poll = await polls.latest_attendance_poll(session)
+    assert poll is not None and poll.max_reminders == 0
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), scheduled, time_budget=10)
+    assert not [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000]
+    to_admin = [c.text for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == SUPER]
+    assert polls.ATTENDANCE_INTRO in to_admin and any("Ты придёшь?" in t for t in to_admin)

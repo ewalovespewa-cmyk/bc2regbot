@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from aiogram.types import InlineKeyboardButton
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,6 +27,7 @@ from app.db.models import (
 )
 from app.services import segments
 from app.services.importer import team_display_name
+from app.services.settings_store import ATTENDANCE_POLL_SENT, claim_setting
 
 ATTENDANCE_OPTIONS = [
     # code, ru, en, asks_reason, keeps_reminding
@@ -148,6 +149,28 @@ async def launch_poll(session: AsyncSession, poll: Poll, settings: Settings, *, 
     await session.flush()
     await start_broadcast(session, intro, settings)
     return intro
+
+
+async def close_open_attendance_polls(session: AsyncSession) -> None:
+    await session.execute(update(Poll).where(Poll.kind == PollKind.ATTENDANCE, Poll.is_active).values(is_active=False))
+
+
+async def launch_scheduled_attendance_poll(session: AsyncSession, settings: Settings) -> Broadcast | None:
+    """Анонс и опрос по расписанию: ровно один раз и без напоминаний. None — уже разосланы."""
+    if not await claim_setting(session, ATTENDANCE_POLL_SENT, True):
+        return None
+    await close_open_attendance_polls(session)  # тестовые опросы больше не принимают ответы
+    poll = await create_attendance_poll(
+        session, created_by=min(settings.superadmin_ids, default=None), reminder_after_hours=None, max_reminders=0
+    )
+    return await launch_poll(session, poll, settings)
+
+
+async def launch_test_attendance_poll(session: AsyncSession, settings: Settings, admin_id: int) -> Broadcast:
+    """Анонс и опрос только одному админу, чтобы посмотреть, как они выглядят."""
+    await close_open_attendance_polls(session)
+    poll = await create_attendance_poll(session, created_by=admin_id, reminder_after_hours=None, max_reminders=0)
+    return await launch_poll(session, poll, settings, segment={"type": segments.SELF})
 
 
 async def record_answer(

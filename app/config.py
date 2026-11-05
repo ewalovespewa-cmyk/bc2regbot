@@ -1,6 +1,8 @@
 """Настройки из переменных окружения. Полное описание каждой переменной — в .env.example."""
+from datetime import datetime
 from functools import lru_cache
 from typing import Annotated
+from zoneinfo import ZoneInfo
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -33,6 +35,8 @@ class Settings(BaseSettings):
     superadmin_ids: Annotated[frozenset[int], NoDecode] = frozenset()
     admin_chat_id: int | None = None
     organizer_contact: str = "@aiesec_astana"
+    # Когда один раз разослать анонс и опрос явки: "ГГГГ-ММ-ДД ЧЧ:ММ", местное время. Пусто — запуск вручную.
+    attendance_poll_at: str = ""
 
     # Поведение
     timezone: str = "Asia/Almaty"
@@ -94,6 +98,19 @@ class Settings(BaseSettings):
     @property
     def sheets_enabled(self) -> bool:
         return bool(self.sheet_id and self.google_service_account_json)
+
+    @property
+    def attendance_poll_time(self) -> datetime | None:
+        if not self.attendance_poll_at:
+            return None
+        return datetime.strptime(self.attendance_poll_at, "%Y-%m-%d %H:%M").replace(tzinfo=ZoneInfo(self.timezone))
+
+    @field_validator("attendance_poll_at")
+    @classmethod
+    def _check_attendance_poll_at(cls, value: str) -> str:
+        if value:
+            datetime.strptime(value, "%Y-%m-%d %H:%M")
+        return value
 
     @field_validator("superadmin_ids", mode="before")
     @classmethod

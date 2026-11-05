@@ -102,17 +102,17 @@ async def test_unlink(h, session):
 
 async def test_edit_content(h, session):
     await h.text(SUPER, "/content")
-    await h.callback(SUPER, SUPER, "c:edit:faq:ru")
+    await h.callback(SUPER, SUPER, "c:edit:schedule:ru")
     await h.text(SUPER, "Бейджи выдаём на входе")
     assert "Предпросмотр" in "".join(h.session.texts(SUPER))
     await h.callback(SUPER, SUPER, "c:save")
-    page = await session.get(ContentPage, ("faq", "ru"))
+    page = await session.get(ContentPage, ("schedule", "ru"))
     assert page.text_html == "Бейджи выдаём на входе"
 
     await h.text(ARU, "/start ARUtoken0001")
-    await h.text(ARU, "❓ FAQ")
+    await h.text(ARU, "🗓 Расписание")
     assert h.session.last_text(ARU) == "Бейджи выдаём на входе"
 
-    await h.callback(SUPER, SUPER, "c:reset:faq:ru")
+    await h.callback(SUPER, SUPER, "c:reset:schedule:ru")
     session.expire_all()
-    assert await session.get(ContentPage, ("faq", "ru")) is None
+    assert await session.get(ContentPage, ("schedule", "ru")) is None

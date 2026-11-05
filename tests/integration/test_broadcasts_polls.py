@@ -277,3 +277,11 @@ async def test_call_result_from_card(h, session, world):
     await h.callback(SUPER, SUPER, f"pc:set:{person.id}:{poll.options[0].id}")
     answer = await session.get(PollAnswer, (poll.id, person.id))
     assert answer.source.value == "call" and answer.answered_by == SUPER
+
+
+async def test_attendance_buttons_are_colored(session):
+    poll = await polls.create_attendance_poll(session, created_by=SUPER)
+    rows = await polls.poll_keyboard_rows(session, poll.id, "ru")
+    buttons = [row[0] for row in rows]
+    assert [b.text for b in buttons] == ["🟢 Приду", "🔴 Не смогу", "🟡 Пока думаю"]
+    assert [b.style for b in buttons] == ["success", "danger", None]  # жёлтого стиля в Telegram нет

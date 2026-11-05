@@ -21,8 +21,6 @@ start:
 
     ✅ <b><i>Check-in</i></b> at the entrance in a couple of seconds.
 
-    ✉️ <b><i>Questions</i></b> to the organizers right here.
-
     It's all in the menu below 👇
   welcome_team: "👥 <b>Team:</b> {team}"
   welcome_solo: "🙋 <b>Team:</b> solo for now, you can team up on site"
@@ -60,9 +58,7 @@ menu:
   status: "👤 My status"
   schedule: "🗓 Schedule"
   location: "📍 Location"
-  faq: "❓ FAQ"
   contacts: "☎️ Contacts"
-  ask: "✉️ Ask a question"
   language: "🌐 Русский"
   games: "🎮 Games"
   games_chat: "💬 Group chat"
@@ -75,9 +71,7 @@ status:
   team: "Team: <b>{team}</b>"
   solo: "Team: solo"
   you: " (you)"
-  team_legend: "<i>✅ in the bot · ⏳ hasn't opened the bot yet</i>"
   attendance: "Coming to the event: <b>{answer}</b>"
-  attendance_none: "The “Are you coming?” poll hasn't started yet, or there's no answer so far."
   checkins: "\n<b>Check-in:</b>"
   checked_at: "✅ checked in, {time}"
   not_checked: "—"
@@ -88,24 +82,10 @@ content:
 
     For now, save the dates: <b>November 14–15</b>, Nazarbayev University.
   location: "📍 <b>Nazarbayev University</b>\nAstana, 53 Kabanbay Batyr Ave"
-  faq: |-
-    ❓ <b>FAQ</b> is coming here soon.
-
-    Got a question already? Tap “✉️ Ask a question”.
   contacts: |-
     ☎️ <b>Organizers:</b> {contact}
     📣 <b>Channel:</b> {channel}
 
-question:
-  prompt: "✉️ Send your question in one message, a photo is fine. We'll reply right here in the bot!"
-  cancel: "Cancel"
-  cancelled: "OK, cancelled 👌"
-  sent: "✅ Question sent! The answer will come here."
-  unsupported: "🙏 Please send text or a photo with a caption."
-  too_long: "😅 A bit too long. Please keep it under {limit} characters."
-  rate_limited: "⏳ That's a lot of questions in a row. Wait {minutes} min and we'll continue 🙏"
-  no_admin_chat: "Questions aren't accepted here right now. Message us directly: {contact}"
-  answer: "💬 <b>Reply from the organizers</b>\n\n{answer}"
 
 poll:
   not_participant: "🔒 This poll is for participants only. Tap /start to get in."

@@ -7,14 +7,6 @@ from app.db.models import Participant, Role
 from app.services.roles import get_role, has_role
 
 
-class InAdminChat(BaseFilter):
-    """Событие из чата организаторов (ADMIN_CHAT_ID)."""
-
-    async def __call__(self, event: Message | CallbackQuery, settings: Settings) -> bool:
-        message = event.message if isinstance(event, CallbackQuery) else event
-        return bool(settings.admin_chat_id and message and message.chat.id == settings.admin_chat_id)
-
-
 class Registered(BaseFilter):
     """Пользователь привязан к отобранному участнику (данные кладёт ParticipantMiddleware)."""
 

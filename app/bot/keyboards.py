@@ -10,7 +10,7 @@ from aiogram.types import (
 from app.config import Settings
 from app.i18n import SUPPORTED_LANGS, t
 
-MENU_ITEMS = ("status", "checkin", "schedule", "location", "faq", "contacts", "ask", "language")
+MENU_ITEMS = ("status", "checkin", "schedule", "location", "contacts", "language")
 
 # Адрес Mini App со сканером QR. Задаётся при сборке диспетчера, если у бота есть HTTPS-адрес.
 WEBAPP_URL: str | None = None
@@ -30,8 +30,7 @@ def main_menu(lang: str) -> ReplyKeyboardMarkup:
         keyboard=[
             [checkin, b("status")],
             [b("schedule"), b("location")],
-            [b("faq"), b("contacts")],
-            [b("ask"), b("language")],
+            [b("contacts"), b("language")],
         ],
         resize_keyboard=True,
         is_persistent=True,
@@ -43,12 +42,6 @@ def contact_keyboard(lang: str) -> ReplyKeyboardMarkup:
         keyboard=[[KeyboardButton(text=t("start.contact_button", lang), request_contact=True)]],
         resize_keyboard=True,
         one_time_keyboard=True,
-    )
-
-
-def cancel_keyboard(lang: str) -> ReplyKeyboardMarkup:
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text=t("question.cancel", lang))]], resize_keyboard=True, one_time_keyboard=True
     )
 
 
@@ -65,10 +58,4 @@ def games_keyboard(settings: Settings, lang: str) -> InlineKeyboardMarkup | None
 def channel_keyboard(settings: Settings, lang: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=t("start.channel_button", lang), url=settings.channel_link)]]
-    )
-
-
-def answer_question_keyboard(question_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="✍️ Ответить", callback_data=f"q:answer:{question_id}")]]
     )

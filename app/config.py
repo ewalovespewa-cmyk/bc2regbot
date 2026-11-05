@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     # Люди и чаты
     superadmin_ids: Annotated[frozenset[int], NoDecode] = frozenset()
     admin_chat_id: int | None = None
-    organizer_contact: str = "@businesscup_support"
+    organizer_contact: str = "@aiesec_astana"
 
     # Поведение
     timezone: str = "Asia/Almaty"

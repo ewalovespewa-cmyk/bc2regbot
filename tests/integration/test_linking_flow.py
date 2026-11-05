@@ -3,7 +3,7 @@ import pytest
 from sqlalchemy import func, select
 
 from app.config import Settings
-from app.db.models import OutboundEvent, Participant, Question, QuestionStatus, SecurityEvent, Team
+from app.db.models import OutboundEvent, Participant, SecurityEvent, Team
 from app.db.session import create_sessionmaker
 from tests.harness import Harness
 
@@ -125,7 +125,13 @@ async def test_status_and_pages(h, session):
     h.session.clear()
     await h.text(ARU, "👤 Мой статус")
     status = h.session.last_text(ARU)
-    assert "Aru Bekova" in status and "Rockets" in status and "✅ Dana Ospan" in status
+    assert "Aru Bekova" in status and "Rockets" in status and "• Dana Ospan" in status
+    assert "Опрос" not in status and "в боте" not in status and "✅ Dana" not in status
+
+    await h.text(ARU, "✉️ Задать вопрос")  # кнопка со старой клавиатуры: просто показываем меню заново
+    assert "Выбери пункт" in h.session.last_text(ARU)
+    await h.text(ARU, "❓ FAQ")
+    assert "Выбери пункт" in h.session.last_text(ARU)
 
     await h.text(ARU, "📍 Локация")
     assert any(type(c).__name__ == "SendLocation" for c in h.session.sent(ARU))
@@ -139,55 +145,6 @@ async def test_language_switch(h, session):
     assert (await participant(session, "aru@mail.com")).lang == "en"
     await h.text(ARU, "👤 My status")
     assert "My status" in h.session.last_text(ARU)
-
-
-async def test_question_round_trip(h, session):
-    await h.text(ARU, "/start ARUtoken0001")
-    await h.text(ARU, "✉️ Задать вопрос")
-    await h.text(ARU, "Где взять бейдж?")
-    assert "Вопрос отправлен" in h.session.last_text(ARU)
-
-    question = await session.scalar(select(Question))
-    to_admins = h.session.sent(ADMIN_CHAT)[-1]
-    assert "Где взять бейдж?" in to_admins.text and to_admins.reply_markup is not None
-
-    # Ответ reply-ем на вопрос. Неадмина бот игнорирует, админа — пересылает участнику.
-    await h.group_reply(ADMIN_CHAT, 4242, question.admin_chat_message_id, "Я не админ")
-    assert "Я не админ" not in h.session.last_text(ARU)
-    await h.group_reply(ADMIN_CHAT, SUPERADMIN, question.admin_chat_message_id, "На ресепшене 🙂")
-    assert "На ресепшене" in h.session.last_text(ARU)
-    question_id = question.id
-    session.expire_all()
-    assert await session.scalar(select(Question.status).where(Question.id == question_id)) == QuestionStatus.ANSWERED
-
-
-async def test_question_via_answer_button(h, session, redis):
-    await h.text(ARU, "/start ARUtoken0001")
-    await h.text(ARU, "✉️ Задать вопрос")
-    await h.text(ARU, "Можно прийти позже?")
-    question = await session.scalar(select(Question))
-
-    await h.callback(ADMIN_CHAT, SUPERADMIN, f"q:answer:{question.id}", message_id=question.admin_chat_message_id)
-    prompt_id = int((await redis.keys("qprompt:*"))[0].rsplit(":", 1)[1])
-    await h.group_reply(ADMIN_CHAT, SUPERADMIN, prompt_id, "Да, до 12:00")
-    assert "до 12:00" in h.session.last_text(ARU)
-
-
-async def test_question_rate_limit(h, session):
-    await h.text(ARU, "/start ARUtoken0001")
-    for i in range(3):
-        await h.text(ARU, "✉️ Задать вопрос")
-        await h.text(ARU, f"вопрос {i}")
-    await h.text(ARU, "✉️ Задать вопрос")
-    assert "Подожди" in h.session.last_text(ARU)
-    assert await session.scalar(select(func.count()).select_from(Question)) == 3
-
-
-async def test_menu_button_during_question_cancels(h, session):
-    await h.text(ARU, "/start ARUtoken0001")
-    await h.text(ARU, "✉️ Задать вопрос")
-    await h.text(ARU, "👤 Мой статус")
-    assert await session.scalar(select(func.count()).select_from(Question)) == 0
 
 
 async def test_duplicate_update_processed_once(h, session):

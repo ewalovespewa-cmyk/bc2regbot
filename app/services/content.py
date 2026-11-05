@@ -1,4 +1,4 @@
-"""Редактируемые тексты: расписание, локация, FAQ, контакты.
+"""Редактируемые тексты: расписание, локация, контакты.
 
 Пока админ ничего не задал, показывается текст по умолчанию из locales (content.<key>).
 """
@@ -10,7 +10,7 @@ from app.config import Settings
 from app.db.models import ContentPage
 from app.i18n import t
 
-PAGES = ("schedule", "location", "faq", "contacts")
+PAGES = ("schedule", "location", "contacts")
 # Nazarbayev University, Кабанбай батыра 53, Астана.
 DEFAULT_LOCATION = (51.0905, 71.3985)
 

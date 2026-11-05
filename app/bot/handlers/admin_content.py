@@ -1,4 +1,4 @@
-"""/content: админ редактирует расписание, локацию, FAQ и контакты прямо в боте.
+"""/content: админ редактирует расписание, локацию и контакты прямо в боте.
 
 Новый текст присылается обычным сообщением — форматирование Telegram (жирный, ссылки…)
 сохраняется. Перед сохранением бот показывает предпросмотр. Для локации можно прислать
@@ -23,7 +23,7 @@ from app.services.content import PAGES, get_page
 router = Router(name="admin_content")
 router.message.filter(F.chat.type == "private")
 
-TITLES = {"schedule": "🗓 Расписание", "location": "📍 Локация", "faq": "❓ FAQ", "contacts": "☎️ Контакты"}
+TITLES = {"schedule": "🗓 Расписание", "location": "📍 Локация", "contacts": "☎️ Контакты"}
 LANG_FLAGS = {"ru": "RU", "en": "EN"}
 MAX_TEXT = 4000
 

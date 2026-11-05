@@ -142,7 +142,7 @@ async def _seed_days(sessionmaker, settings: Settings) -> None:
 
 
 async def _check_admin_chat(bot: Bot, settings: Settings) -> None:
-    """Без чата организаторов бот работает, но алерты и вопросы участников уйдут в никуда — предупреждаем."""
+    """Без чата организаторов бот работает, но алерты уйдут в никуда — предупреждаем."""
     if not settings.admin_chat_id:
         log.warning("admin_chat_not_configured")
         return

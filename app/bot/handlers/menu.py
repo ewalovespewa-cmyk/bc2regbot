@@ -51,11 +51,6 @@ async def show_location(message: Message, session: AsyncSession, settings: Setti
     await _show_page(message, session, settings, participant, "location")
 
 
-@router.message(menu_text("faq"))
-async def show_faq(message: Message, session: AsyncSession, settings: Settings, participant: Participant) -> None:
-    await _show_page(message, session, settings, participant, "faq")
-
-
 @router.message(menu_text("contacts"))
 async def show_contacts(message: Message, session: AsyncSession, settings: Settings, participant: Participant) -> None:
     await _show_page(message, session, settings, participant, "contacts")

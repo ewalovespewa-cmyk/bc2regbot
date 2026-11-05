@@ -1,7 +1,7 @@
 """Общий механизм опросов (опрос явки — первый из них; позже можно добавить фидбек и др.).
 
 Опрос рассылается обычной рассылкой с кнопками вариантов. Ответ можно менять до дедлайна.
-Вариант с asks_reason просит причину, вариант с keeps_reminding («Пока не знаю») не
+Вариант с asks_reason просит причину, вариант с keeps_reminding («Пока думаю») не
 останавливает напоминания. Напоминания — тоже рассылки с сегментом poll_pending.
 """
 import html
@@ -30,10 +30,12 @@ from app.services.importer import team_display_name
 
 ATTENDANCE_OPTIONS = [
     # code, ru, en, asks_reason, keeps_reminding
-    ("yes", "Приду ✅", "I'm coming ✅", False, False),
-    ("no", "Не смогу ❌", "Can't make it ❌", True, False),
-    ("maybe", "Пока не знаю 🤔", "Not sure yet 🤔", False, True),
+    ("yes", "🟢 Приду", "🟢 I'm coming", False, False),
+    ("no", "🔴 Не смогу", "🔴 Can't make it", True, False),
+    ("maybe", "🟡 Пока думаю", "🟡 Still thinking", False, True),
 ]
+# Цвет кнопки по ответу. Жёлтого стиля у кнопок Telegram нет, поэтому «думаю» без заливки, с 🟡 в подписи.
+OPTION_STYLES = {"yes": "success", "no": "danger"}
 DEFAULT_ATTENDANCE_QUESTION = (
     "⏳ <b>Business Cup 2.0 уже совсем скоро!</b>\n\n"
     "📍 <b>Venue:</b> Nazarbayev University\n🗓 <b>Date:</b> 14–15 ноября\n\n<b>Ты придёшь?</b>"
@@ -56,7 +58,8 @@ def is_open(poll: Poll, now: datetime | None = None) -> bool:
 async def poll_keyboard_rows(session: AsyncSession, poll_id: int, lang: str) -> list[list[InlineKeyboardButton]]:
     poll = await session.get(Poll, poll_id)
     return [
-        [InlineKeyboardButton(text=option_label(o, lang), callback_data=f"pl:{poll.id}:{o.id}")] for o in poll.options
+        [InlineKeyboardButton(text=option_label(o, lang), callback_data=f"pl:{poll.id}:{o.id}", style=OPTION_STYLES.get(o.code))]
+        for o in poll.options
     ]
 
 

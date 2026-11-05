@@ -16,7 +16,6 @@ from app.bot.handlers import (
     checkin,
     menu,
     polls,
-    questions,
     service,
     start,
 )
@@ -68,9 +67,7 @@ def create_dispatcher(
         admin_broadcast.router,
         polls.router,
         checkin.router,
-        questions.admin_router,
         start.router,
-        questions.router,  # раньше меню: состояние «пишу вопрос» важнее кнопок
         menu.router,
         menu.fallback_router,  # последним: всё, что не поймали остальные
     )

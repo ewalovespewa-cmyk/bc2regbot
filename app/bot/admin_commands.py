@@ -14,7 +14,7 @@ ADMIN_COMMANDS: list[tuple[str, str, Role]] = [
     ("menu", "Меню участника", Role.VOLUNTEER),
     ("export", "Выгрузка bot_status.csv", Role.ADMIN),
     ("sync", "Записать статусы в Google Sheet", Role.ADMIN),
-    ("content", "Редактировать расписание, локацию, FAQ, контакты", Role.ADMIN),
+    ("content", "Редактировать расписание, локацию, контакты", Role.ADMIN),
     ("broadcast", "Новая рассылка", Role.ADMIN),
     ("broadcasts", "Список рассылок, отмена", Role.ADMIN),
     ("poll", "Опрос явки: сводка, /poll start, /poll close", Role.ADMIN),

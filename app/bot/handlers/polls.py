@@ -215,7 +215,10 @@ async def on_call_ask(callback: CallbackQuery, session: AsyncSession) -> None:
     if poll is None:
         await callback.answer("Опроса явки ещё не было", show_alert=True)
         return
-    rows = [[_btn(o.label_ru, f"pc:set:{pid}:{o.id}")] for o in poll.options]
+    rows = [
+        [InlineKeyboardButton(text=o.label_ru, callback_data=f"pc:set:{pid}:{o.id}", style=poll_service.OPTION_STYLES.get(o.code))]
+        for o in poll.options
+    ]
     await callback.message.answer("📞 Что ответил участник по телефону?", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
     await callback.answer()
 

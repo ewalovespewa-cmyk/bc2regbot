@@ -43,14 +43,13 @@ async def build_status(session: AsyncSession, participant: Participant, lang: st
         ).all()
         lines.append(t("status.team", lang, team=html.escape(team_display_name(team, lang))))
         for m in members:
-            mark = "✅" if m.telegram_user_id else "⏳"
             you = t("status.you", lang) if m.id == participant.id else ""
-            lines.append(f"  {mark} {html.escape(m.full_name)}{you}")
-        lines.append(t("status.team_legend", lang))
+            lines.append(f"  • {html.escape(m.full_name)}{you}")
 
     answer = await attendance_answer(session, participant.id, lang)
-    lines.append("")
-    lines.append(t("status.attendance", lang, answer=html.escape(answer)) if answer else t("status.attendance_none", lang))
+    if answer:
+        lines.append("")
+        lines.append(t("status.attendance", lang, answer=html.escape(answer)))
 
     days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
     if days:

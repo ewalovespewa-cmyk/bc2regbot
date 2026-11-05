@@ -43,7 +43,7 @@ class Question(Base):
 class ContentPage(Base):
     __tablename__ = "content_pages"
 
-    key: Mapped[str] = mapped_column(String(32), primary_key=True)  # schedule / location / faq / contacts
+    key: Mapped[str] = mapped_column(String(32), primary_key=True)  # schedule / location / contacts
     lang: Mapped[str] = mapped_column(String(5), primary_key=True)
     text_html: Mapped[str] = mapped_column(Text)
     latitude: Mapped[float | None] = mapped_column(Float)

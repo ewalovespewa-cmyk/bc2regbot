@@ -215,3 +215,18 @@ async def test_screen_command_gives_link_buttons(engine, redis, world):
 
     await h.text(VOL, "/admin")  # волонтёру ссылки на экран не нужны
     assert not [b.url for row in h.session.sent(VOL)[-1].reply_markup.inline_keyboard for b in row if b.url]
+
+
+async def test_checkin_survives_failed_reply(h, session, world):
+    """Telegram не принял ответ: отметка всё равно сохранена, повторный скан это покажет."""
+    day_id = world.id
+    from aiogram.exceptions import TelegramRetryAfter
+
+    h.session.fail_for[ARU] = TelegramRetryAfter(method=SendMessage(chat_id=ARU, text="x"), message="flood", retry_after=30)
+    await h.text(ARU, f"/start ci_{code_for(day_id)}")
+    h.session.fail_for.clear()
+    session.expire_all()
+    assert await session.scalar(select(func.count()).select_from(Checkin)) == 1
+
+    await h.text(ARU, f"/start ci_{code_for(day_id)}")
+    assert "Отметка уже есть" in h.session.last_text(ARU)

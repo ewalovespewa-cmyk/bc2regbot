@@ -107,6 +107,7 @@ async def handle_code(
         return
 
     result = await self_checkin(session, participant, code or "", settings)
+    await session.commit()  # отметка важнее ответа: сбой отправки не должен её откатить
     if result.status == CheckinStatus.INVALID_CODE and await _too_many_invalid(message, session, bot, redis, settings, lang):
         return
     await reply_result(message, result, participant, session, settings)
@@ -119,4 +120,5 @@ async def finish_pending(
     if not pending or time.time() - float(pending.get("at", 0)) > PENDING_TTL:
         return
     result = await checkin_pending(session, participant, int(pending["day_id"]), settings)
+    await session.commit()
     await reply_result(message, result, participant, session, settings)

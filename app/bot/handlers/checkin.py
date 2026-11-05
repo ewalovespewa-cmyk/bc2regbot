@@ -101,6 +101,7 @@ async def on_mark(callback: CallbackQuery, session: AsyncSession, settings: Sett
     method = CheckinMethod.VOLUNTEER if role == Role.VOLUNTEER else CheckinMethod.ADMIN
     result = await manual_checkin(session, p, day, method, callback.from_user.id)
     await log_admin_action(session, callback.from_user.id, "checkin_manual", f"participant:{p.id}", day=day.label)
+    await session.commit()
     if result.status == CheckinStatus.ALREADY:
         at = result.checkin.created_at.astimezone(ZoneInfo(settings.timezone)).strftime("%H:%M")
         await callback.answer(f"Уже отмечен в {at}", show_alert=True)

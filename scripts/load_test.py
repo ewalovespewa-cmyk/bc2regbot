@@ -44,13 +44,14 @@ def database_url() -> str:
     return server.get_uri().rsplit("/", 1)[0] + "/bc_load"
 
 
-async def run(duration: float) -> bool:
+async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0) -> bool:
     from aiogram import Bot
     from aiogram.client.session.aiohttp import AiohttpSession
     from aiogram.client.telegram import TelegramAPIServer
     from aiogram.types import Chat, Message, MessageEntity, Update, User
     from sqlalchemy import func, select, text
 
+    from app.bot.flood_wait import FloodWaitMiddleware
     from app.bot.setup import create_dispatcher
     from app.config import Settings, normalize_db_url
     from app.db.base import Base
@@ -99,7 +100,9 @@ async def run(duration: float) -> bool:
         day_id = await session.scalar(select(EventDay.id))
 
     fake, runner = await fake_telegram.start(FAKE_PORT)
+    fake.delay, fake.every_429, fake.retry_after = tg_delay, checkin_429, 1
     bot = Bot(settings.bot_token, session=AiohttpSession(api=TelegramAPIServer.from_base(f"http://127.0.0.1:{FAKE_PORT}")))
+    bot.session.middleware(FloodWaitMiddleware())
     dp = create_dispatcher(bot=bot, redis=redis, sessionmaker=sm, settings=settings)
     ok = True
 
@@ -117,10 +120,17 @@ async def run(duration: float) -> bool:
 
     rnd = random.Random(42)
 
+    latencies: list[float] = []
+
+    async def timed_update(uid: int, update_id: int) -> None:
+        begun = time.monotonic()
+        await dp.feed_update(bot, start_update(uid, update_id))
+        latencies.append(time.monotonic() - begun)
+
     async def participant_flow(uid: int) -> None:
         await asyncio.sleep(rnd.uniform(0, duration))
         uid_update = next(update_ids)
-        tasks = [dp.feed_update(bot, start_update(uid, uid_update))]
+        tasks = [timed_update(uid, uid_update)]
         roll = rnd.random()
         if roll < 0.1:  # Telegram повторно доставил тот же апдейт
             tasks.append(dp.feed_update(bot, start_update(uid, uid_update)))
@@ -136,11 +146,14 @@ async def run(duration: float) -> bool:
     async with sm() as session:
         checkins = await session.scalar(select(func.count()).select_from(Checkin))
         distinct = await session.scalar(select(func.count(func.distinct(Checkin.participant_id))))
-    ok_messages = Counter(uid for uid, texts in fake.sent.items() for t in texts if "Ты отмечен" in t)
+    ok_messages = Counter(uid for uid, texts in fake.sent.items() for t in texts if "Есть отметка" in t)
     doubled = [uid for uid, n in ok_messages.items() if n > 1]
     missing = [uid for uid in users if ok_messages[uid] == 0]
+    latencies.sort()
+    print(f"  время ответа: p50 {latencies[len(latencies) // 2] * 1000:.0f} мс, "
+          f"p95 {latencies[int(len(latencies) * 0.95)] * 1000:.0f} мс, макс {latencies[-1] * 1000:.0f} мс")
     print(f"  чекинов в БД: {checkins} (уникальных {distinct}) за {phase1:.1f} с")
-    print(f"  «Ты отмечен» получили: {len(ok_messages)}; дважды: {len(doubled)}; без ответа: {len(missing)}")
+    print(f"  «Есть отметка» получили: {len(ok_messages)}; дважды: {len(doubled)}; без ответа: {len(missing)}")
     ok &= checkins == distinct == len(users) and not doubled and not missing
 
     # --- фаза 2: рассылка на всех с 429 и 403
@@ -192,11 +205,13 @@ async def run(duration: float) -> bool:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--tg-delay", type=float, default=0, help="задержка ответа поддельного Telegram, секунды")
+    parser.add_argument("--checkin-429", type=int, default=0, help="каждый N-й ответ при чекине получает 429")
     parser.add_argument("--duration", type=float, default=60, help="за сколько секунд прийти 300 участникам")
     args = parser.parse_args()
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    sys.exit(0 if asyncio.run(run(args.duration)) else 1)
+    sys.exit(0 if asyncio.run(run(args.duration, args.tg_delay, args.checkin_429)) else 1)
 
 
 if __name__ == "__main__":

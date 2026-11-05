@@ -38,7 +38,7 @@ from app.services.exports import all_tables, tables_to_xlsx
 from app.services.importer import ImportAborted, assign_teams
 from app.services.linking import linked_count, reset_links
 from app.services.roles import has_role
-from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting, set_setting
+from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, EVENT_LOCK, get_setting, set_setting
 from app.services.sheet_sync import format_import_report, format_teams_report, import_from_sheet, import_rows, push_status_to_sheet
 from app.services.sources import SheetsError, parse_table_file
 
@@ -170,8 +170,17 @@ IMPORT_HINTS = {
 }
 
 
+async def _blocked_by_event_lock(callback: CallbackQuery, session: AsyncSession) -> bool:
+    if not await get_setting(session, EVENT_LOCK, False):
+        return False
+    await callback.answer("🔒 Включён режим мероприятия. Выключить можно в разделе «✅ Чекин».", show_alert=True)
+    return True
+
+
 @router.callback_query(F.data.in_({"a:imp:selected", "a:imp:all", "a:imp:teams"}), RoleFilter(Role.SUPERADMIN))
-async def on_import_ask(callback: CallbackQuery, state: FSMContext) -> None:
+async def on_import_ask(callback: CallbackQuery, state: FSMContext, session: AsyncSession) -> None:
+    if await _blocked_by_event_lock(callback, session):
+        return
     mode = callback.data.split(":")[2]
     await state.set_state(AdminUI.import_file)
     await state.update_data(import_mode=mode)
@@ -238,6 +247,8 @@ async def on_any_file(message: Message, state: FSMContext) -> None:
 
 @router.callback_query(F.data.startswith("a:file:"), RoleFilter(Role.SUPERADMIN))
 async def on_pending_file(callback: CallbackQuery, state: FSMContext, bot: Bot, session: AsyncSession, settings: Settings) -> None:
+    if await _blocked_by_event_lock(callback, session):
+        return
     pending = (await state.get_data()).get("pending_file")
     if not pending:
         await callback.answer("Файл не найден — пришли его ещё раз", show_alert=True)
@@ -285,7 +296,7 @@ async def on_export(callback: CallbackQuery, session: AsyncSession, settings: Se
 async def on_sync(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
     await callback.answer("Обновляю Google Sheet…")
     try:
-        count = await push_status_to_sheet(session, settings)
+        count = await push_status_to_sheet(session, settings, force=True)
     except SheetsError as exc:
         await callback.message.answer(f"❌ {html.escape(str(exc))}")
         return
@@ -335,7 +346,10 @@ async def on_checkin(callback: CallbackQuery, session: AsyncSession, settings: S
         rows.append([_btn("🖥 Экран: " + ("выключить" if day.is_screen_enabled else "включить"), "a:ci:screen")])
     rows.append([_btn("📊 Статистика по командам", "a:ci:stats"), _btn("📅 Дни", "m:days")])
     if has_role(role, Role.SUPERADMIN):
-        rows.append([_btn("🧹 Сбросить отметки и привязки (тест)", "m:reset")])
+        locked = await get_setting(session, EVENT_LOCK, False)
+        rows.append([_btn(f"🔒 Режим мероприятия: {'включён' if locked else 'выключен'}", "a:lock:toggle")])
+        if not locked:
+            rows.append([_btn("🧹 Сбросить отметки и привязки (тест)", "m:reset")])
     if links := screen_links_keyboard(settings):
         rows.append(links.inline_keyboard[0])
     rows.append([_btn("🚨 Подозрительное", "a:susp"), _btn("🔄 Обновить", "m:checkin")])
@@ -447,6 +461,8 @@ async def on_day_delete_ask(callback: CallbackQuery, session: AsyncSession) -> N
 
 @router.callback_query(F.data.startswith("a:day:delok:"), RoleFilter(Role.SUPERADMIN))
 async def on_day_delete(callback: CallbackQuery, state: FSMContext, session: AsyncSession, settings: Settings, role: Role) -> None:
+    if await _blocked_by_event_lock(callback, session):
+        return
     day = await session.get(EventDay, int(callback.data.split(":")[3]))
     if day is not None:
         label = day.label
@@ -454,6 +470,22 @@ async def on_day_delete(callback: CallbackQuery, state: FSMContext, session: Asy
         await log_admin_action(session, callback.from_user.id, "day_delete", label, checkins=removed)
         await callback.message.answer(f"🗑 День «{html.escape(label)}» удалён, отметок удалено: {removed}.")
     await on_days(callback, state, session, settings, role)
+
+
+# --- режим мероприятия
+
+
+@router.callback_query(F.data == "a:lock:toggle", RoleFilter(Role.SUPERADMIN))
+async def on_event_lock_toggle(callback: CallbackQuery, session: AsyncSession, settings: Settings, role: Role) -> None:
+    locked = not await get_setting(session, EVENT_LOCK, False)
+    await set_setting(session, EVENT_LOCK, locked)
+    await log_admin_action(session, callback.from_user.id, "event_lock", "on" if locked else "off")
+    await callback.answer(
+        "🔒 Режим мероприятия включён: сбросы, удаление дней и импорт файлов заблокированы, "
+        "удаление строки из таблицы не закрывает человеку вход." if locked else "🔓 Режим мероприятия выключен.",
+        show_alert=True,
+    )
+    await on_checkin(callback, session, settings, role)
 
 
 # --- сброс отметок
@@ -492,6 +524,8 @@ async def on_reset_links_ask(callback: CallbackQuery, session: AsyncSession) -> 
 
 @router.callback_query(F.data == "a:resetlinksok", RoleFilter(Role.SUPERADMIN))
 async def on_reset_links(callback: CallbackQuery, session: AsyncSession) -> None:
+    if await _blocked_by_event_lock(callback, session):
+        return
     removed = await reset_links(session)
     await log_admin_action(session, callback.from_user.id, "links_reset", "all", removed=removed)
     await _edit_or_send(callback, f"🔗 Отвязано аккаунтов: <b>{removed}</b>.", _kb([_btn("« Чекин", "m:checkin")], BACK))
@@ -510,6 +544,8 @@ async def on_reset_ask(callback: CallbackQuery) -> None:
 
 @router.callback_query(F.data.startswith("a:resetok:"), RoleFilter(Role.SUPERADMIN))
 async def on_reset(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    if await _blocked_by_event_lock(callback, session):
+        return
     scope = callback.data.split(":")[2]
     day_id = None
     if scope == "today":

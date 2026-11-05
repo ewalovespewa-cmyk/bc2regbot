@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.bot import errors
+from app.bot.flood_wait import FloodWaitMiddleware
 from app.bot.handlers import (
     admin_broadcast,
     admin_content,
@@ -28,11 +29,13 @@ TELEGRAM_TIMEOUT = 30  # секунд на любой запрос к Bot API
 
 
 def create_bot(settings: Settings) -> Bot:
-    return Bot(
+    bot = Bot(
         settings.bot_token,
         session=AiohttpSession(timeout=TELEGRAM_TIMEOUT),
         default=DefaultBotProperties(parse_mode=ParseMode.HTML, link_preview_is_disabled=True),
     )
+    bot.session.middleware(FloodWaitMiddleware())
+    return bot
 
 
 def create_dispatcher(

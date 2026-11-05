@@ -54,6 +54,7 @@ async def on_answer(
         return
 
     await poll_service.record_answer(session, poll, participant, option)
+    await session.commit()  # ответ важнее подтверждения
     label = poll_service.option_label(option, participant.lang)
     # На «Приду» и «Не смогу» ниже уходит сообщение, всплывашка нужна только остальным вариантам.
     coming = option.code == "yes"
@@ -94,6 +95,7 @@ async def on_reason(message: Message, state: FSMContext, session: AsyncSession, 
     if participant is None:
         return
     await poll_service.set_reason(session, data["poll_id"], participant.id, message.text)
+    await session.commit()
     await message.answer(t("poll.reason_thanks", participant.lang), reply_markup=main_menu(participant.lang))
 
 

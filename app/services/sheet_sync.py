@@ -1,9 +1,14 @@
 """Сценарии поверх импорта: из Google Sheet в БД и статусы обратно в лист bot_status."""
+import hashlib
+import json
+import time
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
-from app.services.exports import all_tables
+from app.services.exports import Table, all_tables
 from app.services.importer import ImportAborted, ImportReport, TeamsReport, assign_teams, import_applications, mark_finalists
+from app.services.settings_store import EVENT_LOCK, get_setting
 from app.services.sources import Row, SheetMissing, SheetsClient
 
 
@@ -45,7 +50,8 @@ async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[
             settings,
             rows,
             assume_selected=settings.sheet_source_all_selected,
-            deselect_missing=settings.sheet_source_all_selected,
+            # В режиме мероприятия строка, случайно удалённая из вкладки, не закрывает человеку вход.
+            deselect_missing=settings.sheet_source_all_selected and not await get_setting(session, EVENT_LOCK, False),
         )
     except ImportAborted as exc:
         raise ImportAborted(f"Лист «{client.last_read_title}»: {exc}") from exc
@@ -70,10 +76,32 @@ async def sync_finalists(session: AsyncSession, settings: Settings) -> tuple[int
         raise ImportAborted(f"Лист «{name}»: {exc}") from exc
 
 
-async def push_status_to_sheet(session: AsyncSession, settings: Settings) -> int:
-    """Пишет вкладки «Статус бота» и «Чекин <день>» в Google Sheet. Возвращает число отобранных."""
+REWRITE_EVERY_SECONDS = 1800  # даже без изменений: вкладку могли испортить руками
+_last_written: dict[tuple[str, str], tuple[str, float]] = {}  # (таблица, вкладка) → (отпечаток, когда)
+
+
+def _fingerprint(table: Table) -> str:
+    payload = json.dumps([table.header, table.rows, table.row_colors], ensure_ascii=False, default=str)
+    return hashlib.sha1(payload.encode()).hexdigest()
+
+
+async def push_status_to_sheet(session: AsyncSession, settings: Settings, *, force: bool = False) -> int:
+    """Пишет вкладки «Статус бота» и «Чекин <день>» в Google Sheet, только изменившиеся (force — все).
+
+    Возвращает число отобранных.
+    """
     tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet)
-    await SheetsClient(settings).write_tables(tables)
+    now = time.monotonic()
+    changed = []
+    for table in tables:
+        fingerprint, written_at = _last_written.get((settings.sheet_id, table.name), ("", 0.0))
+        stale = not written_at or now - written_at >= REWRITE_EVERY_SECONDS
+        if force or stale or fingerprint != _fingerprint(table):
+            changed.append(table)
+    if changed:
+        await SheetsClient(settings).write_tables(changed)
+        for table in changed:
+            _last_written[(settings.sheet_id, table.name)] = (_fingerprint(table), now)
     return len(tables[0].rows)
 
 

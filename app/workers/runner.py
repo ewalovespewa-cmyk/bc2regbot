@@ -52,6 +52,7 @@ class Job:
     run: Callable[[JobContext], Awaitable[None]]
     interval: Callable[[JobContext], float]  # секунды; ≤ 0 — задача выключена
     timeout: float = 300
+    group: str = "main"  # задачи одной группы идут по очереди, разные группы друг друга не ждут
 
 
 class LeaderLock:
@@ -72,19 +73,23 @@ class Scheduler:
     def __init__(self, ctx: JobContext, jobs: list[Job], *, tick: float = TICK_SECONDS) -> None:
         self.ctx, self.jobs, self.tick = ctx, jobs, tick
         self.lock = LeaderLock(ctx.redis)
-        self._task: asyncio.Task | None = None
+        self._tasks: list[asyncio.Task] = []
         self._heartbeat: asyncio.Task | None = None
         self.is_leader = False
 
     def start(self) -> None:
         self._heartbeat = asyncio.create_task(self._heartbeat_loop(), name="scheduler-heartbeat")
-        self._task = asyncio.create_task(self._loop(), name="scheduler")
+        groups: dict[str, list[Job]] = {}
+        for job in self.jobs:
+            groups.setdefault(job.group, []).append(job)
+        self._tasks = [asyncio.create_task(self._loop(jobs), name=f"scheduler-{group}") for group, jobs in groups.items()]
 
     async def stop(self) -> None:
-        for task in (self._task, self._heartbeat):
+        tasks = [*self._tasks, self._heartbeat]
+        for task in tasks:
             if task:
                 task.cancel()
-        for task in (self._task, self._heartbeat):
+        for task in tasks:
             if task:
                 try:
                     await task
@@ -109,10 +114,10 @@ class Scheduler:
                 log.warning("scheduler_lock_error", error=repr(exc))
             await asyncio.sleep(LOCK_TTL / 3)
 
-    async def _loop(self) -> None:
+    async def _loop(self, jobs: list[Job]) -> None:
         while True:
             if self.is_leader:
-                for job in self.jobs:
+                for job in jobs:
                     if not self.is_leader:
                         break
                     await self._maybe_run(job)

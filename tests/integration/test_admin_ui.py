@@ -328,3 +328,108 @@ async def test_status_rows_are_colored_by_answer(session):
     sheet = load_workbook(io.BytesIO(tables_to_xlsx([status]))).worksheets[0]
     assert sheet["A2"].fill.fgColor.rgb.endswith("C6EFCE") and sheet["A3"].fill.fgColor.rgb.endswith("FFC7CE")
     assert sheet["A4"].fill.fill_type is None
+
+
+class _RecordingClient:
+    written: list[str] = []
+
+    def __init__(self, settings):
+        pass
+
+    async def write_tables(self, tables):
+        type(self).written.extend(t.name for t in tables)
+
+
+async def test_sheet_written_only_when_changed(session, monkeypatch):
+    from app.services import sheet_sync
+
+    monkeypatch.setattr(sheet_sync, "SheetsClient", _RecordingClient)
+    monkeypatch.setattr(sheet_sync, "_last_written", {})
+    monkeypatch.setattr(_RecordingClient, "written", [])
+    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
+    today, _ = await _seed_checkins(session)
+
+    await push_status_to_sheet(session, settings)
+    assert len(_RecordingClient.written) == 3
+
+    _RecordingClient.written.clear()
+    await push_status_to_sheet(session, settings)
+    assert _RecordingClient.written == []  # ничего не менялось
+
+    await checkin_service.reset_checkins(session, today.id)
+    await session.flush()
+    await push_status_to_sheet(session, settings)
+    assert "Чекин День 1 (BOT)" in _RecordingClient.written and "Чекин День 2 (BOT)" not in _RecordingClient.written
+
+    _RecordingClient.written.clear()
+    await push_status_to_sheet(session, settings, force=True)  # кнопка обновляет всё
+    assert len(_RecordingClient.written) == 3
+
+    _RecordingClient.written.clear()
+    for key, (fingerprint, _at) in list(sheet_sync._last_written.items()):
+        sheet_sync._last_written[key] = (fingerprint, -sheet_sync.REWRITE_EVERY_SECONDS)
+    await push_status_to_sheet(session, settings)
+    assert len(_RecordingClient.written) == 3  # раз в полчаса переписываем на случай ручной порчи
+
+
+async def test_event_lock_blocks_dangerous_actions(h, session):
+    from app.services.settings_store import EVENT_LOCK, get_setting
+
+    today, _ = await _seed_checkins(session)
+    day_id = today.id
+    linked = select(func.count()).select_from(Participant).where(Participant.telegram_user_id.is_not(None))
+    before = await session.scalar(linked)
+
+    await h.callback(ADMIN_ID, ADMIN_ID, "a:lock:toggle")  # обычному админу нельзя
+    session.expire_all()
+    assert not await get_setting(session, EVENT_LOCK, False)
+
+    await h.callback(SUPER, SUPER, "a:lock:toggle")
+    session.expire_all()
+    assert await get_setting(session, EVENT_LOCK, False) is True
+    assert "m:reset" not in _buttons(_last_with_markup(h, SUPER))
+
+    for data in ("a:resetok:all", "a:resetlinksok", f"a:day:delok:{day_id}"):
+        await h.callback(SUPER, SUPER, data)
+    session.expire_all()
+    assert await checkin_service.checkins_count(session) == 4
+    assert await session.scalar(linked) == before
+    assert await session.get(EventDay, day_id) is not None
+
+    await h.callback(SUPER, SUPER, "a:lock:toggle")  # выключили — снова работает
+    await h.callback(SUPER, SUPER, "a:resetok:all")
+    session.expire_all()
+    assert await checkin_service.checkins_count(session) == 0
+
+
+async def test_event_lock_keeps_access_when_row_removed(session, monkeypatch):
+    from app.services import sheet_sync
+    from app.services.settings_store import EVENT_LOCK, set_setting
+
+    sheet = {"rows": _passed_rows(ROW_A, ROW_B)}
+
+    class FakeClient:
+        last_read_title = "Прошли отбор (BOT)"
+
+        def __init__(self, settings):
+            pass
+
+        async def read_rows(self, worksheet):
+            return sheet["rows"]
+
+    monkeypatch.setattr(sheet_sync, "SheetsClient", FakeClient)
+    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
+    await sheet_sync.import_from_sheet(session, settings)
+
+    await set_setting(session, EVENT_LOCK, True)
+    await session.flush()
+    sheet["rows"] = _passed_rows(ROW_B)
+    report, _ = await sheet_sync.import_from_sheet(session, settings)
+    assert report.deselected == 0
+    selected = select(func.count()).select_from(Participant).where(Participant.is_selected)
+    assert await session.scalar(selected) == 2
+
+    await set_setting(session, EVENT_LOCK, False)
+    await session.flush()
+    report, _ = await sheet_sync.import_from_sheet(session, settings)
+    assert report.deselected == 1

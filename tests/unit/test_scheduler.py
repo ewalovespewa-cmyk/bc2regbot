@@ -87,3 +87,31 @@ async def test_missing_sheet_tab_gives_friendly_throttled_alert(redis, monkeypat
     sent = ctx.bot.send_message.await_args_list
     assert len(sent) == 1  # второй раз — тишина (раз в час)
     assert "нет вкладки «Прошли отбор»" in sent[0].args[1] and "Traceback" not in sent[0].args[1]
+
+
+async def test_slow_sheet_job_does_not_hold_broadcasts(redis):
+    """Зависший Google не задерживает задачи другой группы."""
+    release, ticked = asyncio.Event(), asyncio.Event()
+
+    async def hung(ctx):
+        await release.wait()
+
+    async def broadcast(ctx):
+        ticked.set()
+
+    jobs = [Job("sheet", hung, lambda ctx: 1, group="sheets"), Job("broadcast", broadcast, lambda ctx: 1)]
+    sched = Scheduler(_ctx(redis), jobs, tick=0.01)
+    sched.start()
+    try:
+        await asyncio.wait_for(ticked.wait(), 2)
+    finally:
+        release.set()
+        await sched.stop()
+
+
+def test_sheet_jobs_are_separate_from_broadcasts():
+    from app.workers.jobs import all_jobs
+
+    groups = {job.name: job.group for job in all_jobs()}
+    assert groups["broadcasts"] == "main" and groups["outbox"] == "main"
+    assert groups["auto_import"] == groups["finalists"] == groups["sheet_status_sync"] == "sheets"

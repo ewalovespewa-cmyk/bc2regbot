@@ -103,6 +103,7 @@ async def _handle_result(
     pending = (await state.get_data()).get("pending_checkin")
     await state.clear()
     if result.ok:
+        await session.commit()  # привязка важнее приветствия
         await send_welcome(message, result.participant, settings, first_time=result.status == LinkStatus.LINKED)
         await finish_pending(message, pending, result.participant, session, settings)
         return

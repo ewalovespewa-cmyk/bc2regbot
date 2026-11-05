@@ -19,6 +19,7 @@ from aiohttp import web
 class FakeTelegram:
     def __init__(self, every_429: int = 0, blocked: set[int] | None = None, retry_after: int = 1) -> None:
         self.every_429 = every_429
+        self.delay = 0.0  # имитация времени ответа Telegram, секунды
         self.blocked = blocked or set()
         self.retry_after = retry_after
         self.requests = itertools.count(1)
@@ -37,6 +38,8 @@ class FakeTelegram:
 
         chat_id = params.get("chat_id")
         n = next(self.requests)
+        if self.delay:
+            await asyncio.sleep(self.delay)
         if method.startswith("send") and self.every_429 and n % self.every_429 == 0:
             self.errors_429 += 1
             return web.json_response(

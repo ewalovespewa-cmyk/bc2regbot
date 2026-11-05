@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Setting
 
+# Режим мероприятия: сбросы, удаление дней и импорт файлов заблокированы, из таблицы людей только добавляем.
+EVENT_LOCK = "event_lock"
 AUTO_IMPORT_ENABLED = "auto_import_enabled"
 AUTO_IMPORT_DEFAULT = True  # если Google Sheet подключён, автоимпорт включён, пока его не выключат
 

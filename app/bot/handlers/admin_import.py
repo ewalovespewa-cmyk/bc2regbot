@@ -14,6 +14,7 @@ from app.config import Settings
 from app.db.models import Role
 from app.services.audit import log_admin_action
 from app.services.exports import all_tables, tables_to_xlsx
+from app.services.settings_store import EVENT_LOCK, get_setting
 from app.services.importer import ImportAborted, assign_teams
 from app.services.sheet_sync import (
     format_import_report,
@@ -60,6 +61,9 @@ async def cmd_import(
     message: Message, command: CommandObject, bot: Bot, session: AsyncSession, settings: Settings
 ) -> None:
     document = _document(message)
+    if document and await get_setting(session, EVENT_LOCK, False):
+        await message.answer("🔒 Включён режим мероприятия: импорт файлов заблокирован. Выключить можно в разделе «✅ Чекин».")
+        return
     assume_selected = (command.args or "").strip().lower() == "all"
     try:
         if document:
@@ -136,7 +140,7 @@ async def cmd_sync(message: Message, session: AsyncSession, settings: Settings) 
         await message.answer("Google Sheet пока не подключён. Выгрузка в файл: /export")
         return
     try:
-        count = await push_status_to_sheet(session, settings)
+        count = await push_status_to_sheet(session, settings, force=True)
     except SheetsError as exc:
         await message.answer(f"❌ {html.escape(str(exc))}")
         return

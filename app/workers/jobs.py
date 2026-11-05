@@ -119,8 +119,9 @@ def all_jobs() -> list[Job]:
         Job("broadcasts", broadcasts, lambda ctx: 2, timeout=120),
         Job("poll_reminders", poll_reminders, lambda ctx: 60),
         Job("outbox", outbox, lambda ctx: 5 if ctx.settings.gamification_webhook_url else 0, timeout=120),
-        Job("auto_import", auto_import, sheets(lambda ctx: ctx.settings.auto_import_minutes)),
-        Job("finalists", finalists, sheets(lambda ctx: ctx.settings.auto_import_minutes)),
-        Job("sheet_status_sync", sheet_status_sync, sheets(lambda ctx: ctx.settings.sheet_sync_minutes)),
+        # Google может отвечать минутами, поэтому таблица в своей группе и не задерживает рассылки.
+        Job("auto_import", auto_import, sheets(lambda ctx: ctx.settings.auto_import_minutes), group="sheets"),
+        Job("finalists", finalists, sheets(lambda ctx: ctx.settings.auto_import_minutes), group="sheets"),
+        Job("sheet_status_sync", sheet_status_sync, sheets(lambda ctx: ctx.settings.sheet_sync_minutes), group="sheets"),
     ]
     return jobs

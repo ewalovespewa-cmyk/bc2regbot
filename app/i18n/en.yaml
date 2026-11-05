@@ -79,7 +79,8 @@ content:
     🗓 <b>The schedule</b> will be here closer to the event.
 
     For now, save the dates: <b>November 14–15</b>, Nazarbayev University.
-  location: "📍 <b>Nazarbayev University</b>\nAstana, 53 Kabanbay Batyr Ave"
+  location: "📍 <b>Nazarbayev University</b>\nAstana, 53 Kabanbay Batyr Ave\n\n🟠 <b>November 14:</b> Orange Hall"
+  location_final: "🟢 <b>November 15:</b> Green Hall"
   contacts: |-
     ☎️ <b>Organizers:</b> {contact}
     📣 <b>Channel:</b> {channel}

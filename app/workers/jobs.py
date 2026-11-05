@@ -6,7 +6,7 @@ from app.services import broadcast, polls
 from app.services.importer import ImportAborted
 from app.services.sources import SheetsError
 from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting
-from app.services.sheet_sync import import_from_sheet, push_status_to_sheet
+from app.services.sheet_sync import import_from_sheet, push_status_to_sheet, sync_finalists
 from app.workers.runner import Job, JobContext
 
 log = get_logger(__name__)
@@ -62,6 +62,26 @@ async def auto_import(ctx: JobContext) -> None:
         )
 
 
+async def finalists(ctx: JobContext) -> None:
+    async with ctx.sessionmaker() as session:
+        if not await get_setting(session, AUTO_IMPORT_ENABLED, AUTO_IMPORT_DEFAULT):
+            return
+        try:
+            count, unknown = await sync_finalists(session, ctx.settings)
+        except (SheetsError, ImportAborted) as exc:
+            await session.rollback()
+            await _sheet_problem(ctx, "finalists", f"Финалисты не обновились: {exc}")
+            return
+        await session.commit()
+    log.info("finalists_synced", count=count, unknown=len(unknown))
+    if unknown:
+        await _sheet_problem(
+            ctx, "finalists_unknown",
+            f"Во вкладке «{ctx.settings.sheet_finalists_worksheet}» есть почты, которых нет среди участников: "
+            + ", ".join(unknown[:20]),
+        )
+
+
 async def broadcasts(ctx: JobContext) -> None:
     await broadcast.run_worker_cycle(ctx.bot, ctx.sessionmaker, ctx.settings, time_budget=50)
 
@@ -100,6 +120,7 @@ def all_jobs() -> list[Job]:
         Job("poll_reminders", poll_reminders, lambda ctx: 60),
         Job("outbox", outbox, lambda ctx: 5 if ctx.settings.gamification_webhook_url else 0, timeout=120),
         Job("auto_import", auto_import, sheets(lambda ctx: ctx.settings.auto_import_minutes)),
+        Job("finalists", finalists, sheets(lambda ctx: ctx.settings.auto_import_minutes)),
         Job("sheet_status_sync", sheet_status_sync, sheets(lambda ctx: ctx.settings.sheet_sync_minutes)),
     ]
     return jobs

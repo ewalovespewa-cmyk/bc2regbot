@@ -63,6 +63,7 @@ class Settings(BaseSettings):
     # из вкладки — тому доступ закрывается. False: отбор по колонке Selected/«Состояние».
     sheet_source_all_selected: bool = True
     sheet_status_worksheet: str = "Статус бота (BOT)"  # бот пишет сюда статусы + вкладки «Чекин <день>»
+    sheet_finalists_worksheet: str = "Финал (BOT)"  # туда команда переносит прошедших в финал, вкладку создаёт бот
     sheet_teams_worksheet: str = ""  # лист "team_name, email"; пусто → не читаем
     # Поле участника → название колонки, если оно не из стандартных (см. DEFAULT_COLUMN_ALIASES в importer.py).
     sheet_column_map: dict[str, str] = {}

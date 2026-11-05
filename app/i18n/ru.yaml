@@ -79,7 +79,8 @@ content:
     🗓 <b>Расписание</b> появится ближе к проекту.
 
     А пока запоминай даты: <b>14–15 ноября</b>, Nazarbayev University.
-  location: "📍 <b>Nazarbayev University</b>\nАстана, пр. Кабанбай батыра, 53"
+  location: "📍 <b>Nazarbayev University</b>\nАстана, пр. Кабанбай батыра, 53\n\n🟠 <b>14 ноября:</b> Orange Hall"
+  location_final: "🟢 <b>15 ноября:</b> Green Hall"
   contacts: |-
     ☎️ <b>Организаторы:</b> {contact}
     📣 <b>Канал:</b> {channel}

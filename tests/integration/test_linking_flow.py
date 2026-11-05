@@ -205,3 +205,52 @@ def test_participants_are_not_told_about_personal_links():
     for lang in ("ru", "en"):
         text = (P("app/i18n") / f"{lang}.yaml").read_text(encoding="utf-8").lower()
         assert "из письма" not in text and "ссылка уже" not in text and "from your email" not in text
+
+
+async def test_green_hall_only_for_finalists(h, session):
+    from app.services.importer import ImportAborted, mark_finalists
+
+    await h.text(ARU, "/start ARUtoken0001")
+    await h.text(DANA, "/start DANAtoken001")
+
+    async def location(uid):
+        await h.text(uid, "📍 Локация")
+        return h.session.last_text(uid)
+
+    assert "Orange Hall" in await location(ARU) and "Green Hall" not in await location(ARU)
+
+    assert await mark_finalists(session, [{"Почта": "ARU@mail.com"}, {"Почта": "ghost@mail.com"}]) == (1, ["ghost@mail.com"])
+    await session.commit()
+    text = await location(ARU)
+    assert "Orange Hall" in text and "Green Hall" in text
+    assert "Green Hall" not in await location(DANA)
+
+    await mark_finalists(session, [])  # вкладку очистили
+    await session.commit()
+    assert "Green Hall" not in await location(ARU)
+
+    with pytest.raises(ImportAborted, match="почтой"):
+        await mark_finalists(session, [{"Имя": "Без почты"}])
+
+
+async def test_finalists_tab_is_created_when_missing(session, monkeypatch):
+    from app.config import Settings
+    from app.services import sheet_sync
+    from app.services.sources import SheetMissing
+
+    made = []
+
+    class FakeClient:
+        def __init__(self, settings):
+            pass
+
+        async def read_rows(self, worksheet):
+            raise SheetMissing("нет вкладки")
+
+        async def create_source_tab(self, name):
+            made.append(name)
+
+    monkeypatch.setattr(sheet_sync, "SheetsClient", FakeClient)
+    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
+    assert await sheet_sync.sync_finalists(session, settings) == (0, [])
+    assert made == ["Финал (BOT)"]

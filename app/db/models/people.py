@@ -57,6 +57,7 @@ class Participant(Base):
     is_blocked_bot: Mapped[bool] = mapped_column(Boolean, server_default=false())
     # Сняли с отбора при повторном импорте — запись остаётся, но бот человека не пускает.
     is_selected: Mapped[bool] = mapped_column(Boolean, server_default=true())
+    is_finalist: Mapped[bool] = mapped_column(Boolean, server_default=false())  # есть во вкладке «Финал (BOT)»
 
     created_at: Mapped[datetime] = created_at_col()
     updated_at: Mapped[datetime] = updated_at_col()

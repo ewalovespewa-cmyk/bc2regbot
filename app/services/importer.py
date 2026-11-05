@@ -5,7 +5,7 @@
 """
 from dataclasses import dataclass, field
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Participant, Team
@@ -319,3 +319,17 @@ async def assign_teams(session: AsyncSession, rows: list[Row]) -> TeamsReport:
 
 async def count_selected(session: AsyncSession) -> int:
     return await session.scalar(select(func.count()).select_from(Participant).where(Participant.is_selected)) or 0
+
+
+async def mark_finalists(session: AsyncSession, rows: list[Row]) -> tuple[int, list[str]]:
+    """Финалисты — те, чьи почты есть в строках; остальные флаг теряют. Возвращает (сколько, неизвестные почты)."""
+    emails: set[str] = set()
+    if rows:
+        email_col = _Columns(rows).find("email", "e-mail", "почта")
+        if not email_col:
+            raise ImportAborted("Нужна колонка с почтой («Почта» или «Email»).")
+        emails = {e for e in (normalize_email(row.get(email_col, "")) for row in rows) if e}
+    known = set((await session.scalars(select(Participant.email).where(Participant.email.in_(emails)))).all())
+    await session.execute(update(Participant).values(is_finalist=Participant.email.in_(emails)))
+    await session.flush()
+    return len(known), sorted(emails - known)

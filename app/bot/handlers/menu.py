@@ -36,7 +36,10 @@ async def show_status(message: Message, session: AsyncSession, settings: Setting
 
 async def _show_page(message: Message, session: AsyncSession, settings: Settings, participant: Participant, key: str) -> None:
     page = await get_page(session, settings, key, participant.lang)
-    await message.answer(page.text_html, reply_markup=main_menu(participant.lang))
+    text = page.text_html
+    if key == "location" and participant.is_finalist:
+        text += "\n" + t("content.location_final", participant.lang)
+    await message.answer(text, reply_markup=main_menu(participant.lang))
     if page.latitude is not None and page.longitude is not None:
         await message.answer_location(page.latitude, page.longitude)
 

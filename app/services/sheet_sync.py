@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
 from app.services.exports import all_tables
-from app.services.importer import ImportAborted, ImportReport, TeamsReport, assign_teams, import_applications
+from app.services.importer import ImportAborted, ImportReport, TeamsReport, assign_teams, import_applications, mark_finalists
 from app.services.sources import Row, SheetMissing, SheetsClient
 
 
@@ -53,6 +53,21 @@ async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[
     if settings.sheet_teams_worksheet:
         teams_report = await assign_teams(session, await client.read_rows(settings.sheet_teams_worksheet))
     return report, teams_report
+
+
+async def sync_finalists(session: AsyncSession, settings: Settings) -> tuple[int, list[str]]:
+    """Забирает вкладку финалистов (создаёт, если её нет). Пустая вкладка — это нормально: финала ещё не было."""
+    name = settings.sheet_finalists_worksheet
+    client = SheetsClient(settings)
+    try:
+        rows = await client.read_rows(name)
+    except SheetMissing:
+        await client.create_source_tab(name)
+        rows = []
+    try:
+        return await mark_finalists(session, rows)
+    except ImportAborted as exc:
+        raise ImportAborted(f"Лист «{name}»: {exc}") from exc
 
 
 async def push_status_to_sheet(session: AsyncSession, settings: Settings) -> int:

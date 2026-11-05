@@ -61,7 +61,7 @@ async def passed_table(session: AsyncSession, timezone: str, name: str = "Ста
 
     header = [
         "ID заявки", "Имя", "Почта", "Телефон", "Telegram (форма)", "Команда", "Роль", "Вуз",
-        "Открыл бота", "Telegram в боте", "Заблокировал бота", "Придёт?", "Причина",
+        "Открыл бота", "Telegram в боте", "Заблокировал бота", "Придёт?", "Причина", "Финал",
         *[f"Чекин: {d.label}" for d in days],
     ]
     rows = []
@@ -87,6 +87,7 @@ async def passed_table(session: AsyncSession, timezone: str, name: str = "Ста
                 YES if p.is_blocked_bot else "",
                 answer_text,
                 (answer[1] or "") if answer else "",
+                YES if p.is_finalist else "",
                 *[_fmt(checkins.get((p.id, d.id)), tz, "%H:%M") for d in days],
             ]
         )

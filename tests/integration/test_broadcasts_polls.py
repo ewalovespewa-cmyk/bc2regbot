@@ -285,3 +285,37 @@ async def test_attendance_buttons_are_colored(session):
     buttons = [row[0] for row in rows]
     assert [b.text for b in buttons] == ["🟢 Приду", "🔴 Не смогу", "🟡 Пока думаю"]
     assert [b.style for b in buttons] == ["success", "danger", None]  # жёлтого стиля в Telegram нет
+
+
+async def test_menu_button_is_not_taken_as_reason(h, session):
+    p0 = 2000
+    await h.text(SUPER, "/poll start")
+    poll = await polls.latest_attendance_poll(session)
+    poll_id, yes_id, no_id = poll.id, poll.options[0].id, poll.options[1].id
+    pid = await session.scalar(select(Participant.id).where(Participant.telegram_user_id == p0))
+
+    async def reason():
+        session.expire_all()
+        return (await session.get(PollAnswer, (poll_id, pid))).reason
+
+    await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
+    edited = [c for c in h.session.calls if type(c).__name__ == "EditMessageReplyMarkup"][-1]
+    assert [row[0].style for row in edited.reply_markup.inline_keyboard] == ["success", "danger", None]  # цвета остаются
+    await h.text(p0, "👤 Мой статус")
+    assert await reason() is None and "Мой статус" in h.session.last_text(p0)
+    await h.text(p0, "не причина, вопрос уже закрыт")
+    assert await reason() is None
+
+    await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
+    await h.text(p0, "/menu")  # команда тоже выходит из вопроса
+    await h.text(p0, "👤 Мой статус")
+    assert await reason() is None and "Мой статус" in h.session.last_text(p0)
+
+    await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
+    await h.callback(p0, p0, f"pl:{poll_id}:{yes_id}")  # передумал: причину больше не ждём
+    await h.text(p0, "просто сообщение")
+    assert await reason() is None
+
+    await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
+    await h.text(p0, "Экзамен")  # обычный текст по-прежнему записывается
+    assert await reason() == "Экзамен"

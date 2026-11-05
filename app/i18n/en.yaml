@@ -71,7 +71,7 @@ status:
   team: "Team: <b>{team}</b>"
   solo: "Team: solo"
   you: " (you)"
-  attendance: "Coming to the event: <b>{answer}</b>"
+  attendance: "Attendance confirmation: <b>{answer}</b>"
   checkins: "\n<b>Check-in:</b>"
   checked_at: "✅ checked in, {time}"
   not_checked: "—"

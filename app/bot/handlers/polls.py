@@ -4,7 +4,8 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from aiogram import F, Router
-from aiogram.filters import Command, CommandObject
+from aiogram.dispatcher.event.bases import SkipHandler
+from aiogram.filters import Command, CommandObject, or_f
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import BufferedInputFile, CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
@@ -12,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.filters import RoleFilter
 from app.bot.handlers.admin_broadcast import parse_local_datetime
-from app.bot.keyboards import main_menu
+from app.bot.keyboards import any_menu_text, main_menu
 from app.config import Settings
 from app.db.models import AnswerSource, Participant, Poll, PollOption, Role
 from app.i18n import t
@@ -58,13 +59,15 @@ async def on_answer(
     try:
         # Кнопки остаются: ответ можно поменять до дедлайна. Отмечаем выбранный вариант.
         rows = [
-            [_btn(("● " if o.id == option.id else "") + poll_service.option_label(o, participant.lang), f"pl:{poll.id}:{o.id}")]
+            [poll_service.option_button(o, participant.lang, f"pl:{poll.id}:{o.id}", selected=o.id == option.id)]
             for o in poll.options
         ]
         await callback.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
     except Exception:
         pass
-    if option.asks_reason:
+    if not option.asks_reason:
+        await state.clear()  # передумал после «Не смогу»: следующее сообщение уже не причина
+    else:
         await state.set_state(PollStates.reason)
         await state.update_data(poll_id=poll.id)
         await callback.message.answer(
@@ -73,7 +76,14 @@ async def on_answer(
         )
 
 
-@router.message(PollStates.reason, F.text, ~F.text.startswith("/"))
+@router.message(PollStates.reason, or_f(any_menu_text(), F.text.startswith("/")))
+async def on_reason_interrupted(message: Message, state: FSMContext) -> None:
+    """Кнопка меню или команда — не причина: выходим из вопроса, а сообщение обрабатываем как обычно."""
+    await state.clear()
+    raise SkipHandler
+
+
+@router.message(PollStates.reason, F.text, ~any_menu_text(), ~F.text.startswith("/"))
 async def on_reason(message: Message, state: FSMContext, session: AsyncSession, participant: Participant | None) -> None:
     data = await state.get_data()
     await state.clear()
@@ -215,10 +225,7 @@ async def on_call_ask(callback: CallbackQuery, session: AsyncSession) -> None:
     if poll is None:
         await callback.answer("Опроса явки ещё не было", show_alert=True)
         return
-    rows = [
-        [InlineKeyboardButton(text=o.label_ru, callback_data=f"pc:set:{pid}:{o.id}", style=poll_service.OPTION_STYLES.get(o.code))]
-        for o in poll.options
-    ]
+    rows = [[poll_service.option_button(o, "ru", f"pc:set:{pid}:{o.id}")] for o in poll.options]
     await callback.message.answer("📞 Что ответил участник по телефону?", reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
     await callback.answer()
 

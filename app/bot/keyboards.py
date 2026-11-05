@@ -21,6 +21,11 @@ def menu_text(key: str):
     return F.text.in_({t(f"menu.{key}", lang) for lang in SUPPORTED_LANGS})
 
 
+def any_menu_text():
+    """Фильтр: текст совпал с любой кнопкой меню."""
+    return F.text.in_({t(f"menu.{key}", lang) for key in MENU_ITEMS for lang in SUPPORTED_LANGS})
+
+
 def main_menu(lang: str) -> ReplyKeyboardMarkup:
     b = lambda key: KeyboardButton(text=t(f"menu.{key}", lang))  # noqa: E731
     checkin = (

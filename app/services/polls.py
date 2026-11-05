@@ -55,12 +55,14 @@ def is_open(poll: Poll, now: datetime | None = None) -> bool:
     return poll.is_active and (poll.deadline_at is None or now < poll.deadline_at)
 
 
+def option_button(option: PollOption, lang: str, callback_data: str, *, selected: bool = False) -> InlineKeyboardButton:
+    text = ("● " if selected else "") + option_label(option, lang)
+    return InlineKeyboardButton(text=text, callback_data=callback_data, style=OPTION_STYLES.get(option.code))
+
+
 async def poll_keyboard_rows(session: AsyncSession, poll_id: int, lang: str) -> list[list[InlineKeyboardButton]]:
     poll = await session.get(Poll, poll_id)
-    return [
-        [InlineKeyboardButton(text=option_label(o, lang), callback_data=f"pl:{poll.id}:{o.id}", style=OPTION_STYLES.get(o.code))]
-        for o in poll.options
-    ]
+    return [[option_button(o, lang, f"pl:{poll.id}:{o.id}")] for o in poll.options]
 
 
 async def create_attendance_poll(

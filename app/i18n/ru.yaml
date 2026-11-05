@@ -71,7 +71,7 @@ status:
   team: "Команда: <b>{team}</b>"
   solo: "Команда: соло"
   you: " (ты)"
-  attendance: "Придёшь на проект: <b>{answer}</b>"
+  attendance: "Подтверждение участия: <b>{answer}</b>"
   checkins: "\n<b>Чекин:</b>"
   checked_at: "✅ есть отметка, {time}"
   not_checked: "—"

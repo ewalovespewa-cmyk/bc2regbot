@@ -36,6 +36,7 @@ from app.services.admins import ASSIGNABLE_ROLES, list_admins, remove_admin, res
 from app.services.audit import log_admin_action
 from app.services.exports import all_tables, tables_to_xlsx
 from app.services.importer import ImportAborted, assign_teams
+from app.services.linking import linked_count, reset_links
 from app.services.roles import has_role
 from app.services.settings_store import AUTO_IMPORT_DEFAULT, AUTO_IMPORT_ENABLED, get_setting, set_setting
 from app.services.sheet_sync import format_import_report, format_teams_report, import_from_sheet, import_rows, push_status_to_sheet
@@ -335,7 +336,7 @@ async def on_checkin(callback: CallbackQuery, session: AsyncSession, settings: S
         rows.append([_btn("🖥 Экран: " + ("выключить" if day.is_screen_enabled else "включить"), "a:ci:screen")])
     rows.append([_btn("📊 Статистика по командам", "a:ci:stats"), _btn("📅 Дни", "m:days")])
     if has_role(role, Role.SUPERADMIN):
-        rows.append([_btn("🧹 Сбросить отметки (тест)", "m:reset")])
+        rows.append([_btn("🧹 Сбросить отметки и привязки (тест)", "m:reset")])
     if links := screen_links_keyboard(settings):
         rows.append(links.inline_keyboard[0])
     rows.append([_btn("🚨 Подозрительное", "a:susp"), _btn("🔄 Обновить", "m:checkin")])
@@ -467,13 +468,34 @@ async def on_reset_menu(callback: CallbackQuery, session: AsyncSession, settings
     if day is not None:
         rows.append([_btn(f"Сегодня — «{day.label}» ({await checkin_service.checkins_count(session, day.id)})", "a:reset:today")])
     rows.append([_btn(f"Все дни ({total})", "a:reset:all")])
+    rows.append([_btn(f"🔗 Отвязать Telegram у всех ({await linked_count(session)})", "a:resetlinks")])
     rows.append([_btn("« Чекин", "m:checkin")])
     await _edit_or_send(
         callback,
-        "🧹 <b>Сброс отметок</b> — для тестов. Отметки удалятся, участники смогут отметиться заново, "
-        "в боте игр у них снова закроется бинго. Привязки к боту и ответы на опрос не трогаются.",
+        "🧹 <b>Сброс для тестов</b>\n\n"
+        "<b>Отметки:</b> удалятся, участники смогут отметиться заново, в боте игр у них снова закроется бинго.\n"
+        "<b>Привязки:</b> бот забудет, кто уже заходил, и на следующий /start снова проверит человека и поздравит "
+        "с прохождением отбора.\n\n"
+        "Сброс отметок не трогает привязки, сброс привязок не трогает отметки. Ответы на опрос остаются в обоих случаях.",
         _kb(*rows),
     )
+
+
+@router.callback_query(F.data == "a:resetlinks", RoleFilter(Role.SUPERADMIN))
+async def on_reset_links_ask(callback: CallbackQuery, session: AsyncSession) -> None:
+    await _edit_or_send(
+        callback,
+        f"Точно отвязать Telegram у <b>всех</b> ({await linked_count(session)})? Это нельзя отменить: "
+        "каждому придётся снова нажать /start.",
+        _kb([_btn("Да, отвязать всех", "a:resetlinksok"), _btn("Отмена", "m:reset")]),
+    )
+
+
+@router.callback_query(F.data == "a:resetlinksok", RoleFilter(Role.SUPERADMIN))
+async def on_reset_links(callback: CallbackQuery, session: AsyncSession) -> None:
+    removed = await reset_links(session)
+    await log_admin_action(session, callback.from_user.id, "links_reset", "all", removed=removed)
+    await _edit_or_send(callback, f"🔗 Отвязано аккаунтов: <b>{removed}</b>.", _kb([_btn("« Чекин", "m:checkin")], BACK))
 
 
 @router.callback_query(F.data.in_({"a:reset:today", "a:reset:all"}), RoleFilter(Role.SUPERADMIN))

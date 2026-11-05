@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from enum import StrEnum
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Participant
@@ -109,6 +109,18 @@ async def unlink(session: AsyncSession, participant: Participant) -> int | None:
     )
     await session.flush()
     return old_id
+
+
+async def linked_count(session: AsyncSession) -> int:
+    return await session.scalar(select(func.count()).select_from(Participant).where(Participant.telegram_user_id.is_not(None)))
+
+
+async def reset_links(session: AsyncSession) -> int:
+    """Отвязывает Telegram у всех записей (сброс после тестов). Возвращает, сколько аккаунтов отвязано."""
+    linked = (await session.scalars(select(Participant).where(Participant.telegram_user_id.is_not(None)))).all()
+    for participant in linked:
+        await unlink(session, participant)
+    return len(linked)
 
 
 async def link_by_token(session: AsyncSession, user: TelegramUser, token: str) -> LinkResult:

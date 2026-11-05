@@ -285,3 +285,23 @@ async def test_list_mode_guard_against_wiped_tab(session, monkeypatch):
     await session.commit()
     assert report.deselected == 0 and report.deselect_blocked == 29
     assert await session.scalar(select(func.count()).select_from(Participant).where(Participant.is_selected)) == 30
+
+
+async def test_reset_links_button_makes_people_new_again(h, session):
+    await _seed_checkins(session)
+    linked = await session.scalar(select(func.count()).select_from(Participant).where(Participant.telegram_user_id.is_not(None)))
+    assert linked
+    await h.callback(ADMIN_ID, ADMIN_ID, "a:resetlinksok")  # админу сброс недоступен
+    session.expire_all()
+    assert await session.scalar(select(func.count()).select_from(Participant).where(Participant.telegram_user_id.is_not(None))) == linked
+
+    await h.callback(SUPER, SUPER, "m:reset")
+    assert "a:resetlinks" in _buttons(_last_with_markup(h, SUPER))
+    await h.callback(SUPER, SUPER, "a:resetlinks")
+    assert "a:resetlinksok" in _buttons(_last_with_markup(h, SUPER))
+    await h.callback(SUPER, SUPER, "a:resetlinksok")
+    session.expire_all()
+    assert await session.scalar(select(func.count()).select_from(Participant).where(Participant.telegram_user_id.is_not(None))) == 0
+    assert await checkin_service.checkins_count(session) == 4  # отметки остались
+    events = await session.scalars(select(OutboundEvent).where(OutboundEvent.type == "participant.unlinked"))
+    assert len(events.all()) == linked

@@ -75,4 +75,4 @@ async def test_export_sends_csv(session):
 
     rows = parse_xlsx(file.data)  # первый лист — «Прошли»
     assert rows[0]["Почта"] == "aru@mail.com"
-    assert rows[0]["Ссылка-приглашение"].startswith("https://t.me/bc_bot?start=")
+    assert "Ссылка-приглашение" not in rows[0]

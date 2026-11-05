@@ -120,7 +120,7 @@ async def cmd_import_teams(message: Message, bot: Bot, session: AsyncSession, se
 
 @router.message(Command("export"), RoleFilter(Role.ADMIN))
 async def cmd_export(message: Message, session: AsyncSession, settings: Settings) -> None:
-    tables = await all_tables(session, settings.bot_username, settings.timezone, settings.sheet_status_worksheet)
+    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet)
     stamp = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     await message.answer_document(
         BufferedInputFile(tables_to_xlsx(tables), filename=f"business_cup_{stamp}.xlsx"),

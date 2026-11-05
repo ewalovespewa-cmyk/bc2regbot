@@ -72,7 +72,7 @@ async def test_token_of_someone_else_refused_and_alerted(h, session):
     h.session.clear()
     await h.text(STRANGER, "/start ARUtoken0001", username="thief")
     assert "уже привязана к другому" in h.session.last_text(STRANGER)
-    assert "чужую ссылку" in h.session.last_text(ADMIN_CHAT)
+    assert "чужую заявку" in h.session.last_text(ADMIN_CHAT)
     assert (await participant(session, "aru@mail.com")).telegram_user_id == ARU
     assert await session.scalar(select(func.count()).select_from(SecurityEvent)) == 1
 

@@ -76,7 +76,7 @@ async def _seed_checkins(session):
 
 async def test_tables_and_excel(session):
     await _seed_checkins(session)
-    tables = await all_tables(session, "bc_bot", "Asia/Almaty")
+    tables = await all_tables(session, "Asia/Almaty")
     assert [t.name for t in tables] == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
     assert len(tables[0].rows) == 3 and len(tables[1].rows) == 3 and len(tables[2].rows) == 1
     assert tables[2].rows[0][6] == "волонтёр"
@@ -86,7 +86,7 @@ async def test_tables_and_excel(session):
 
     wb = load_workbook(io.BytesIO(tables_to_xlsx(tables)))
     assert wb.sheetnames == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
-    assert parse_xlsx(tables_to_xlsx(tables))[0]["Ссылка-приглашение"].startswith("https://t.me/bc_bot?start=")
+    assert "Ссылка-приглашение" not in parse_xlsx(tables_to_xlsx(tables))[0]
 
 
 async def test_push_to_sheet_writes_all_tabs(session, monkeypatch):
@@ -305,3 +305,26 @@ async def test_reset_links_button_makes_people_new_again(h, session):
     assert await checkin_service.checkins_count(session) == 4  # отметки остались
     events = await session.scalars(select(OutboundEvent).where(OutboundEvent.type == "participant.unlinked"))
     assert len(events.all()) == linked
+
+
+async def test_status_rows_are_colored_by_answer(session):
+    from openpyxl import load_workbook
+    import io
+
+    from app.services import polls
+
+    await _seed_checkins(session)
+    people = (await session.scalars(select(Participant).order_by(Participant.id))).all()
+    poll = await polls.create_attendance_poll(session, created_by=SUPER)
+    yes, no, _maybe = poll.options
+    await polls.record_answer(session, poll, people[0], yes)
+    await polls.record_answer(session, poll, people[1], no)
+    await session.flush()
+
+    status, *day_tabs = await all_tables(session, "Asia/Almaty")
+    assert status.row_colors == ["C6EFCE", "FFC7CE", None]  # третий ещё не ответил
+    assert all(tab.row_colors is None for tab in day_tabs)
+
+    sheet = load_workbook(io.BytesIO(tables_to_xlsx([status]))).worksheets[0]
+    assert sheet["A2"].fill.fgColor.rgb.endswith("C6EFCE") and sheet["A3"].fill.fgColor.rgb.endswith("FFC7CE")
+    assert sheet["A4"].fill.fill_type is None

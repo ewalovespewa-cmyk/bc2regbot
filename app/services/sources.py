@@ -96,6 +96,23 @@ def rows_to_csv(header: list[str], rows: list[list[Any]]) -> bytes:
 
 # ---------------------------------------------------------------- Google Sheets
 
+def _row_color_requests(sheet_id: int, cols: int, colors: list[str | None]) -> list[dict[str, Any]]:
+    """Запросы batchUpdate: сбросить заливку строк с данными и покрасить нужные (строка 1 — шапка)."""
+
+    def repeat(start: int, end: int, cell: dict[str, Any]) -> dict[str, Any]:
+        grid = {"sheetId": sheet_id, "startRowIndex": start, "endRowIndex": end, "startColumnIndex": 0, "endColumnIndex": cols}
+        return {"repeatCell": {"range": grid, "cell": cell, "fields": "userEnteredFormat.backgroundColor"}}
+
+    if not colors:
+        return []
+    requests = [repeat(1, len(colors) + 1, {})]
+    for n, color in enumerate(colors, start=1):
+        if color:
+            rgb = {key: int(color[i:i + 2], 16) / 255 for key, i in (("red", 0), ("green", 2), ("blue", 4))}
+            requests.append(repeat(n, n + 1, {"userEnteredFormat": {"backgroundColor": rgb}}))
+    return requests
+
+
 def _service_account_info(raw: str) -> dict[str, Any]:
     raw = raw.strip()
     if not raw.startswith("{"):
@@ -209,9 +226,11 @@ class SheetsClient:
     async def write_tables(self, tables: list[Any]) -> None:
         """Перезаписывает несколько листов (объекты с полями name, header, rows) — по одному пакету на лист."""
         for table in tables:
-            await self.write_table(table.name, table.header, table.rows)
+            await self.write_table(table.name, table.header, table.rows, row_colors=table.row_colors)
 
-    async def write_table(self, worksheet: str, header: list[str], rows: list[list[Any]]) -> None:
+    async def write_table(
+        self, worksheet: str, header: list[str], rows: list[list[Any]], *, row_colors: list[str | None] | None = None
+    ) -> None:
         """Полностью перезаписывает лист одним пакетом (создаёт лист, если его нет)."""
         values = [header, *[["" if v is None else v for v in row] for row in rows]]
 
@@ -227,5 +246,7 @@ class SheetsClient:
             ws.resize(rows=max(len(values), 2), cols=max(len(header), 1))
             ws.clear()
             ws.update(values, "A1", value_input_option="RAW")
+            if requests := _row_color_requests(ws.id, len(header), row_colors or []):
+                spreadsheet.batch_update({"requests": requests})
 
         await self._call(write, f"записать лист «{worksheet}»")

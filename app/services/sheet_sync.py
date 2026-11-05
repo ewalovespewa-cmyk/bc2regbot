@@ -57,7 +57,7 @@ async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[
 
 async def push_status_to_sheet(session: AsyncSession, settings: Settings) -> int:
     """Пишет вкладки «Статус бота» и «Чекин <день>» в Google Sheet. Возвращает число отобранных."""
-    tables = await all_tables(session, settings.bot_username, settings.timezone, settings.sheet_status_worksheet)
+    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet)
     await SheetsClient(settings).write_tables(tables)
     return len(tables[0].rows)
 
@@ -87,7 +87,6 @@ def format_import_report(report: ImportReport) -> str:
         shown = report.warnings[:10]
         more = f"\n… и ещё {len(report.warnings) - 10}" if len(report.warnings) > 10 else ""
         lines.append("\n⚠️ <b>Предупреждения</b>:\n" + "\n".join(f"• {w}" for w in shown) + more)
-    lines.append("\nСсылки для рассылки: /export")
     return "\n".join(lines)
 
 

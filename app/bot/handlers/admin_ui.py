@@ -196,8 +196,7 @@ async def _run_import(
         return
     await log_admin_action(session, actor, f"import_{mode}", filename or "file")
     await session.commit()
-    await message.answer(text.replace("Ссылки для рассылки: /export", "Ссылки для писем — в «📊 Выгрузить Excel»."),
-                         reply_markup=_kb([_btn("👥 К участникам", "m:people")], BACK))
+    await message.answer(text, reply_markup=_kb([_btn("👥 К участникам", "m:people")], BACK))
 
 
 async def _download(bot: Bot, file_id: str, size: int | None) -> bytes:
@@ -271,7 +270,7 @@ async def on_import_sheet(callback: CallbackQuery, session: AsyncSession, settin
 
 @router.callback_query(F.data == "a:export", RoleFilter(Role.ADMIN))
 async def on_export(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
-    tables = await all_tables(session, settings.bot_username, settings.timezone, settings.sheet_status_worksheet)
+    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet)
     stamp = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     tabs = ", ".join(f"«{t.name}» ({len(t.rows)})" for t in tables)
     await callback.message.answer_document(
@@ -572,7 +571,7 @@ async def on_poll_start_ask(callback: CallbackQuery, settings: Settings) -> None
     test = "\n🧪 TEST_MODE: опрос получат только админы." if settings.test_mode else ""
     await _edit_or_send(
         callback,
-        "▶️ Разослать всем привязанным участникам опрос «Ты придёшь?» с кнопками «Приду / Не смогу / Пока не знаю»?\n"
+        "▶️ Разослать всем привязанным участникам опрос «Ты придёшь?» с кнопками «Приду / Не смогу / Пока думаю»?\n"
         "Перед опросом всем автоматически уйдёт анонс о Business Cup, опрос придёт сразу за ним.\n"
         f"Тем, кто не ответил или ответил «Пока думаю», через 6 часов придёт одно напоминание.{test}",
         _kb([_btn("Да, запустить", "a:poll:startok"), _btn("Отмена", "m:comms")]),

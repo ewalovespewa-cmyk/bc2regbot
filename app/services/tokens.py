@@ -14,7 +14,3 @@ def generate_invite_token() -> str:
 
 def is_invite_token(value: str) -> bool:
     return len(value) == TOKEN_LENGTH and all(c in ALPHABET for c in value)
-
-
-def invite_link(bot_username: str, token: str) -> str:
-    return f"https://t.me/{bot_username}?start={token}"

@@ -189,13 +189,13 @@ async def _ask_segment(message: Message, state: FSMContext, session: AsyncSessio
     days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
     rows = [
         [_btn("👥 Все привязанные", "bc:seg:all")],
-        [_btn("✅ Придут", "bc:seg:att:yes"), _btn("❌ Не смогут", "bc:seg:att:no")],
-        [_btn("🤔 Не знают", "bc:seg:att:maybe"), _btn("🙈 Не ответили", "bc:seg:att:none")],
+        [_btn("🟢 Придут", "bc:seg:att:yes"), _btn("🔴 Не смогут", "bc:seg:att:no")],
+        [_btn("🟡 Думают", "bc:seg:att:maybe"), _btn("🙈 Не ответили", "bc:seg:att:none")],
     ]
     for d in days:
         rows.append([_btn(f"Отмечены · {d.label}", f"bc:seg:ci:{d.id}"), _btn(f"Не отмечены · {d.label}", f"bc:seg:nci:{d.id}")])
         rows.append([_btn(f"💌 «Ждём тебя»: придут, но не отмечены · {d.label}", f"bc:seg:wait:{d.id}")])
-    rows.append([_btn("🏷 Конкретная команда", "bc:seg:team"), _btn("🧍 Соло", "bc:seg:solo")])
+    rows.append([_btn("🏷 Конкретная команда", "bc:seg:team"), _btn("🧍 Looking For Team", "bc:seg:solo")])
     rows.append([_btn("🧪 Тест: только мне", "bc:seg:self")])
     await message.answer("Кому отправляем?", reply_markup=_kb(*rows))
 

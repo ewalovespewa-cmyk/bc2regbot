@@ -1,7 +1,7 @@
 import pytest
 
 from app.services.normalize import normalize_email, normalize_phone, normalize_username
-from app.services.tokens import TOKEN_LENGTH, generate_invite_token, invite_link, is_invite_token
+from app.services.tokens import TOKEN_LENGTH, generate_invite_token, is_invite_token
 
 
 @pytest.mark.parametrize(
@@ -57,4 +57,3 @@ def test_tokens_unique_and_valid():
     assert len(tokens) == 2000
     assert all(len(t) == TOKEN_LENGTH and is_invite_token(t) for t in tokens)
     assert not is_invite_token("ci_abcdefghi")
-    assert invite_link("bc_bot", "AbC123") == "https://t.me/bc_bot?start=AbC123"

@@ -60,7 +60,7 @@ menu:
   language: "🌐 English"
   games: "🎮 Игры"
   games_chat: "💬 Общий чат"
-  unknown: "🤔 Не совсем понял. Выбери пункт в меню ниже 👇"
+  unknown: "🤔 Не совсем понятно. Выбери пункт в меню ниже 👇"
   language_switched: "Язык: русский 🇷🇺"
 
 status:
@@ -114,7 +114,7 @@ checkin:
   scan_with_camera: "📷 Наведи камеру телефона на QR на экране у входа. Telegram откроет бота и поставит отметку."
 
 commands:
-  start: "Начать / привязать аккаунт"
+  start: "Начать"
   menu: "Показать меню"
   status: "Мой статус"
 

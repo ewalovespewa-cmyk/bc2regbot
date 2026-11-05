@@ -202,8 +202,7 @@ async def on_unlink_ask(callback: CallbackQuery, session: AsyncSession) -> None:
         await callback.answer("Уже не привязан", show_alert=True)
         return
     await callback.message.answer(
-        f"Отвязать Telegram от <b>{html.escape(p.full_name)}</b>? Человек сможет заново войти по своей ссылке "
-        "или контакту, а текущий аккаунт потеряет доступ.",
+        f"Отвязать Telegram от <b>{html.escape(p.full_name)}</b>? Человек сможет войти заново, нажав /start.",
         reply_markup=InlineKeyboardMarkup(
             inline_keyboard=[[_btn("Да, отвязать", f"p:unlink_ok:{p.id}"), _btn("Отмена", "p:noop")]]
         ),

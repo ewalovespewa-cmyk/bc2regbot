@@ -115,7 +115,7 @@ async def describe(session: AsyncSession, spec: dict[str, Any]) -> str:
         team = await session.get(Team, spec["team_id"])
         return f"команда «{team.name if team else '?'}»"
     if kind == SOLO:
-        return "соло-участники"
+        return "Looking For Team"
     if kind == SELF:
         return "тест: только мне"
     return kind

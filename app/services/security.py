@@ -22,7 +22,7 @@ INVALID_CODE_FLOOD = "invalid_code_flood"
 HELP_AT_ENTRANCE = "help_at_entrance"
 
 TITLES = {
-    TOKEN_OWNED_BY_OTHER: "Попытка привязать чужую ссылку",
+    TOKEN_OWNED_BY_OTHER: "Попытка привязать чужую заявку",
     ACCOUNT_LINKED_TO_OTHER: "Аккаунт уже привязан к другому участнику",
     FOREIGN_CONTACT: "Прислан чужой контакт",
     AMBIGUOUS_PHONE: "Один номер у нескольких участников",

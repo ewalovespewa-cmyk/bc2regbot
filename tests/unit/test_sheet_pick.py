@@ -107,3 +107,16 @@ async def test_missing_source_tab_is_created_and_nobody_is_touched(monkeypatch):
     with pytest.raises(ImportAborted, match="пустой"):
         await sheet_sync.import_from_sheet(None, settings)  # до БД не дошло: снимать с отбора некого
     assert made == ["Прошли отбор (BOT)"]
+
+
+def test_row_color_requests():
+    from app.services.sources import _row_color_requests
+
+    requests = _row_color_requests(7, 5, ["FF0000", None, "00FF00"])
+    reset, red, green = [r["repeatCell"] for r in requests]
+    assert (reset["range"]["startRowIndex"], reset["range"]["endRowIndex"]) == (1, 4) and reset["cell"] == {}
+    assert reset["fields"] == "userEnteredFormat.backgroundColor"
+    assert (red["range"]["startRowIndex"], red["range"]["endRowIndex"], red["range"]["endColumnIndex"]) == (1, 2, 5)
+    assert red["cell"]["userEnteredFormat"]["backgroundColor"] == {"red": 1.0, "green": 0.0, "blue": 0.0}
+    assert green["range"]["startRowIndex"] == 3 and green["range"]["sheetId"] == 7
+    assert _row_color_requests(7, 5, []) == []

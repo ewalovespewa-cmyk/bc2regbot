@@ -137,7 +137,7 @@ async def cmd_poll(message: Message, command: CommandObject, session: AsyncSessi
         dl = f"до {deadline.astimezone(tz):%d.%m %H:%M}" if deadline else "без дедлайна"
         await message.answer(
             f"📋 Опрос #{poll.id} запущен ({dl}): сначала анонс #{b.id}, сразу за ним опрос, {b.stats.get('total', 0)} получателей.\n"
-            f"Напоминание не ответившим и «не знаю»: через {hours} ч, раз: {reminders}."
+            f"Напоминание не ответившим и «Пока думаю»: через {hours} ч, раз: {reminders}."
         )
         return
 
@@ -181,7 +181,7 @@ async def _send_calls(message: Message, session: AsyncSession, settings: Setting
     stamp = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     await message.answer_document(
         BufferedInputFile(rows_to_csv(header, rows), filename=f"calls_{stamp}.csv"),
-        caption=f"📞 На обзвон: {len(rows)} человек (не открыли бота, не ответили, «не знаю»).\n"
+        caption=f"📞 На обзвон: {len(rows)} человек (не открыли бота, не ответили, «Пока думаю»).\n"
         "Результат звонка вноси в карточке участника: /find → «📞 Результат обзвона».",
     )
     if settings.sheets_enabled:

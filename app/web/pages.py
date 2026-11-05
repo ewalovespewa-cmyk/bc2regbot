@@ -105,7 +105,7 @@ async def dashboard_data(request: web.Request) -> web.Response:
             )
             teams: dict[str, dict] = {}
             for name, is_solo, full_name, pid in rows:
-                key = f"Соло · {full_name}" if is_solo else name
+                key = f"Looking For Team · {full_name}" if is_solo else name
                 team = teams.setdefault(key, {"name": key, "solo": is_solo, "present": 0, "total": 0, "members": []})
                 team["total"] += 1
                 team["present"] += pid in checked_ids

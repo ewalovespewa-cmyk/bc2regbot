@@ -114,7 +114,7 @@ checkin:
   scan_with_camera: "📷 Point your phone camera at the QR on the screen at the entrance. Telegram will open the bot and check you in."
 
 commands:
-  start: "Start / link your account"
+  start: "Start"
   menu: "Show the menu"
   status: "My status"
 

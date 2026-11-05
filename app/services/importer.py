@@ -89,7 +89,7 @@ def solo_team_name(email: str) -> str:
 
 def team_display_name(team: Team | None, lang: str = "ru") -> str:
     if team is None or team.is_solo:
-        return "Соло" if lang == "ru" else "Solo"
+        return "Looking For Team"
     return team.name
 
 

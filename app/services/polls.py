@@ -240,7 +240,7 @@ async def _answers_by_participant(session: AsyncSession, poll_id: int) -> dict[i
 
 
 async def call_list(session: AsyncSession, poll: Poll | None) -> tuple[list[str], list[list[str]]]:
-    """Кого обзвонить: не открыли бота, не ответили, ответили «не знаю»."""
+    """Кого обзвонить: не открыли бота, не ответили, ответили «Пока думаю»."""
     answers = await _answers_by_participant(session, poll.id) if poll else {}
     participants = (
         await session.scalars(select(Participant).where(Participant.is_selected).order_by(Participant.full_name))
@@ -254,7 +254,7 @@ async def call_list(session: AsyncSession, poll: Poll | None) -> tuple[list[str]
         elif answer is None:
             why = "не ответил на опрос"
         elif answer[0].keeps_reminding:
-            why = "ответил «не знаю»"
+            why = "ответил «Пока думаю»"
         else:
             continue
         rows.append([p.full_name, p.phone or p.phone_raw or "", p.email, team_display_name(p.team), why,

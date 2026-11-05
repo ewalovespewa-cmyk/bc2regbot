@@ -261,7 +261,7 @@ async def test_reminders_call_list_and_team_report(h, session, settings, world):
 
     header, rows = await polls.call_list(session, poll)
     reasons = {r[2]: r[4] for r in rows}
-    assert reasons == {"p3@x.kz": "ответил «не знаю»", "p4@x.kz": "не ответил на опрос",
+    assert reasons == {"p3@x.kz": "ответил «Пока думаю»", "p4@x.kz": "не ответил на опрос",
                        "p5@x.kz": "не открыл бота", "p6@x.kz": "не ответил на опрос"}
 
     report = await polls.team_report(session, poll)

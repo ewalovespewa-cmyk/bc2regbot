@@ -1,4 +1,4 @@
-"""Выгрузки по вкладкам: «Статус бота» (все отобранные со ссылками и статусами) и по вкладке
+"""Выгрузки по вкладкам: «Статус бота» (все отобранные и их статусы) и по вкладке
 на каждый день чекина. Одни и те же таблицы пишутся в Google Sheet и в Excel-файл.
 """
 import io
@@ -12,9 +12,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, CheckinMethod, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption
 from app.services.importer import team_display_name
-from app.services.tokens import invite_link
 
 YES, NO = "да", "нет"
+ROW_COLORS = {"yes": "C6EFCE", "no": "FFC7CE", "maybe": "FFEB9C"}  # ответ на опрос → заливка строки
 METHOD_TITLES = {CheckinMethod.SELF_QR: "QR", CheckinMethod.VOLUNTEER: "волонтёр", CheckinMethod.ADMIN: "админ"}
 
 
@@ -23,6 +23,7 @@ class Table:
     name: str
     header: list[str]
     rows: list[list[str]]
+    row_colors: list[str | None] | None = None  # цвет каждой строки (hex); None — таблицу не красим
 
 
 def _fmt(dt: datetime | None, tz: ZoneInfo, pattern: str = "%d.%m %H:%M") -> str:
@@ -34,22 +35,22 @@ def checkin_tab_name(day: EventDay) -> str:
     return re.sub(r"[\[\]:*?/\\]", " ", f"Чекин {day.label}")[:94] + " (BOT)"
 
 
-async def _attendance(session: AsyncSession) -> dict[int, tuple[str, str | None, str]]:
+async def _attendance(session: AsyncSession) -> dict[int, tuple[str, str | None, str, str]]:
     poll = await session.scalar(
         select(Poll).where(Poll.kind == PollKind.ATTENDANCE).order_by(Poll.created_at.desc()).limit(1)
     )
     if poll is None:
         return {}
     rows = await session.execute(
-        select(PollAnswer.participant_id, PollOption.label_ru, PollAnswer.reason, PollAnswer.source)
+        select(PollAnswer.participant_id, PollOption.label_ru, PollAnswer.reason, PollAnswer.source, PollOption.code)
         .join(PollOption, PollOption.id == PollAnswer.option_id)
         .where(PollAnswer.poll_id == poll.id)
     )
-    return {pid: (label, reason, source) for pid, label, reason, source in rows}
+    return {pid: (label, reason, source, code) for pid, label, reason, source, code in rows}
 
 
-async def passed_table(session: AsyncSession, bot_username: str, timezone: str, name: str = "Статус бота (BOT)") -> Table:
-    """Вкладка «Статус бота»: строка = отобранный участник. Отсюда берут ссылку для письма."""
+async def passed_table(session: AsyncSession, timezone: str, name: str = "Статус бота (BOT)") -> Table:
+    """Вкладка «Статус бота»: строка = отобранный участник, цвет строки = ответ на опрос."""
     tz = ZoneInfo(timezone)
     days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
     answers = await _attendance(session)
@@ -60,12 +61,14 @@ async def passed_table(session: AsyncSession, bot_username: str, timezone: str, 
 
     header = [
         "ID заявки", "Имя", "Почта", "Телефон", "Telegram (форма)", "Команда", "Роль", "Вуз",
-        "Ссылка-приглашение", "Открыл бота", "Telegram в боте", "Заблокировал бота", "Придёт?", "Причина",
+        "Открыл бота", "Telegram в боте", "Заблокировал бота", "Придёт?", "Причина",
         *[f"Чекин: {d.label}" for d in days],
     ]
     rows = []
+    colors = []
     for p in participants:
         answer = answers.get(p.id)
+        colors.append(ROW_COLORS.get(answer[3]) if answer else None)
         answer_text = ""
         if answer:
             answer_text = answer[0] + (" (обзвон)" if answer[2] == "call" else "")
@@ -79,7 +82,6 @@ async def passed_table(session: AsyncSession, bot_username: str, timezone: str, 
                 team_display_name(p.team),
                 p.team_role or "",
                 p.university or "",
-                invite_link(bot_username, p.invite_token) if bot_username else p.invite_token,
                 YES if p.telegram_user_id else NO,
                 f"@{p.telegram_username}" if p.telegram_username else ("" if not p.telegram_user_id else str(p.telegram_user_id)),
                 YES if p.is_blocked_bot else "",
@@ -88,7 +90,7 @@ async def passed_table(session: AsyncSession, bot_username: str, timezone: str, 
                 *[_fmt(checkins.get((p.id, d.id)), tz, "%H:%M") for d in days],
             ]
         )
-    return Table(name, header, rows)
+    return Table(name, header, rows, row_colors=colors)
 
 
 async def checkin_table(session: AsyncSession, day: EventDay, timezone: str) -> Table:
@@ -117,16 +119,16 @@ async def checkin_table(session: AsyncSession, day: EventDay, timezone: str) -> 
     return Table(checkin_tab_name(day), header, rows)
 
 
-async def all_tables(session: AsyncSession, bot_username: str, timezone: str, passed_name: str = "Статус бота (BOT)") -> list[Table]:
-    tables = [await passed_table(session, bot_username, timezone, passed_name)]
+async def all_tables(session: AsyncSession, timezone: str, passed_name: str = "Статус бота (BOT)") -> list[Table]:
+    tables = [await passed_table(session, timezone, passed_name)]
     for day in (await session.scalars(select(EventDay).order_by(EventDay.date))).all():
         tables.append(await checkin_table(session, day, timezone))
     return tables
 
 
-async def bot_status_table(session: AsyncSession, bot_username: str, timezone: str) -> tuple[list[str], list[list[str]]]:
+async def bot_status_table(session: AsyncSession, timezone: str) -> tuple[list[str], list[list[str]]]:
     """Вкладка «Статус бота» как (заголовок, строки) — для CSV."""
-    table = await passed_table(session, bot_username, timezone)
+    table = await passed_table(session, timezone)
     return table.header, table.rows
 
 
@@ -144,8 +146,11 @@ def tables_to_xlsx(tables: list[Table]) -> bytes:
         ws.append(table.header)
         for cell in ws[1]:
             cell.font, cell.fill = head_font, head_fill
-        for row in table.rows:
+        for n, row in enumerate(table.rows):
             ws.append(row)
+            if table.row_colors and table.row_colors[n]:
+                for cell in ws[ws.max_row]:
+                    cell.fill = PatternFill("solid", fgColor=table.row_colors[n])
         ws.freeze_panes = "A2"
         for column in ws.columns:
             width = max((len(str(c.value or "")) for c in column), default=8)

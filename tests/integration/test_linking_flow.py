@@ -52,7 +52,8 @@ async def test_link_by_token(h, session):
     await h.text(ARU, "/start ARUtoken0001", username="Aru_B", lang="en")
     p = await participant(session, "aru@mail.com")
     assert p.telegram_user_id == ARU and p.telegram_username == "aru_b" and p.lang == "en"
-    assert "Aru" in h.session.texts(ARU)[0] and "Rockets" in h.session.texts(ARU)[0]
+    welcome = h.session.texts(ARU)[0]
+    assert "Aru" in welcome and "Rockets" in welcome and "congrats" in welcome and "t.me/business_cup_2026" in welcome
     assert any("photo hunt" in t for t in h.session.texts(ARU))  # кнопка в бот игр
     assert await session.scalar(select(func.count()).select_from(OutboundEvent)) == 1  # событие для бота игр
 
@@ -91,18 +92,18 @@ async def test_unknown_start_asks_for_contact_then_links_by_phone(h, session):
 
     await h.contact(DANA, "87022223344")  # без плюса, с 8 — как бывает в контакте
     assert (await participant(session, "dana@mail.com")).telegram_user_id == DANA
-    assert "Dana" in h.session.texts(DANA)[-1] or "Dana" in h.session.texts(DANA)[-2]
+    assert any("Dana" in t for t in h.session.texts(DANA))
 
 
 async def test_foreign_contact_refused(h, session):
     await h.contact(DANA, "+77022223344", contact_user_id=555)
-    assert "свой" in h.session.last_text(DANA)
+    assert "твой" in h.session.last_text(DANA)
     assert (await participant(session, "dana@mail.com")).telegram_user_id is None
 
 
 async def test_unknown_phone_and_deselected_get_polite_refusal(h, session):
     await h.contact(STRANGER, "+77770000000")
-    assert "Не нашли вас" in h.session.last_text(STRANGER) and "@bc_org" in h.session.last_text(STRANGER)
+    assert "Не нашли тебя" in h.session.last_text(STRANGER) and "@bc_org" in h.session.last_text(STRANGER)
     h.session.clear()
     await h.text(STRANGER, "/start GONEtoken001")  # снят с отбора — как будто нет
     assert h.session.sent(STRANGER)[-1].reply_markup.keyboard[0][0].request_contact is True
@@ -192,7 +193,7 @@ async def test_menu_button_during_question_cancels(h, session):
 async def test_duplicate_update_processed_once(h, session):
     await h.text(ARU, "/start ARUtoken0001", update_id=777)
     await h.text(ARU, "/start ARUtoken0001", update_id=777)
-    assert len(h.session.sent(ARU)) == 2  # приветствие + кнопка игр, только один раз
+    assert len(h.session.sent(ARU)) == 3  # поздравление + меню + подсказка про игры, только один раз
 
 
 async def test_start_links_silently_by_telegram_username(h, session):

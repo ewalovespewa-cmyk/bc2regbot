@@ -29,7 +29,7 @@ async def get_page(session: AsyncSession, settings: Settings, key: str, lang: st
     if row is not None:
         return Page(row.text_html, row.latitude, row.longitude)
 
-    text = t(f"content.{key}", lang, contact=settings.organizer_contact)
+    text = t(f"content.{key}", lang, contact=settings.organizer_contact, channel=settings.channel_link)
     if key == "location":
         return Page(text, *DEFAULT_LOCATION)
     return Page(text)

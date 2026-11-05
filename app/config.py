@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     gamification_webhook_secret: str = ""
     games_bot_username: str = ""
     games_chat_link: str = ""
+    channel_link: str = "https://t.me/business_cup_2026"  # канал: в приветствии и «Контактах»
 
     # Google Sheets (этап 2). Пока SHEET_ID пуст, импорт идёт из CSV, выгрузка — в CSV.
     sheet_id: str = ""

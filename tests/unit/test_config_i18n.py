@@ -36,6 +36,6 @@ def test_pick_lang():
 
 
 def test_translation_fallbacks():
-    assert t("errors.generic", "en").startswith("Something went wrong")
+    assert "Something went wrong" in t("errors.generic", "en")
     assert t("errors.generic", "kk") == t("errors.generic", "ru")
     assert t("no.such.key", "ru") == "no.such.key"

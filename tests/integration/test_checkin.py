@@ -68,13 +68,13 @@ def code_for(day_id: int, offset: float = 0) -> str:
 async def test_self_checkin_ok_already_and_team_count(h, session, world):
     await h.text(ARU, f"/start ci_{code_for(world.id)}")
     texts = h.session.texts(ARU)
-    assert "Ты отмечен" in texts[-2] and "1/3 на месте" in texts[-2] and "Бинго открыто" in texts[-1]
+    assert "Есть отметка" in texts[-2] and "1/3 на месте" in texts[-2] and "Бинго открыто" in texts[-1]
 
     await h.text(DANA, f"/start ci_{code_for(world.id)}")
     assert "2/3 на месте" in h.session.texts(DANA)[-2]
 
     await h.text(ARU, f"/start ci_{code_for(world.id)}")
-    assert "уже отмечен" in h.session.last_text(ARU)
+    assert "Отметка уже есть" in h.session.last_text(ARU)
     assert await session.scalar(select(func.count()).select_from(Checkin)) == 2
     events = (await session.scalars(select(OutboundEvent).where(OutboundEvent.type == "checkin.created"))).all()
     assert len(events) == 2 and events[0].payload["telegram_user_id"] == ARU
@@ -102,7 +102,7 @@ async def test_pending_checkin_after_linking_by_contact(h, session, world):
     await h.text(NEW, f"/start ci_{code_for(world.id)}")
     assert "Сначала привяжем аккаунт" in h.session.last_text(NEW)
     await h.contact(NEW, "87055556677")
-    assert any("Ты отмечен" in t for t in h.session.texts(NEW))
+    assert any("Есть отметка" in t for t in h.session.texts(NEW))
     pid = await session.scalar(select(Participant.id).where(Participant.email == "new@x.kz"))
     assert await session.scalar(select(func.count()).select_from(Checkin).where(Checkin.participant_id == pid)) == 1
 
@@ -125,7 +125,7 @@ async def test_web_app_scanner(h, session, world):
     msg = Message(message_id=1, date=dt.now(UTC), chat=Chat(id=ARU, type="private"), from_user=h.user(ARU),
                   web_app_data=WebAppData(data=link, button_text="✅ Отметиться"))
     await h.feed(Update(update_id=99_001, message=msg))
-    assert any("Ты отмечен" in t for t in h.session.texts(ARU))
+    assert any("Есть отметка" in t for t in h.session.texts(ARU))
 
 
 async def test_volunteer_marks_admin_cancels(h, session, world):
@@ -196,7 +196,7 @@ async def test_qr_scan_unlinked_with_matching_username_checks_in_at_once(h, sess
     await session.commit()
     await h.text(NEW, f"/start ci_{code_for(world.id)}", username="New_Person")
     texts = h.session.texts(NEW)
-    assert any("Ты отмечен" in t for t in texts)
+    assert any("Есть отметка" in t for t in texts)
     assert not any("Сначала привяжем" in t for t in texts)  # без контакта
 
 

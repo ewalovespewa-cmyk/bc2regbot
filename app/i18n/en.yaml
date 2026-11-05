@@ -1,39 +1,58 @@
 start:
-  hello: "Hi! This is the Business Cup 2.0 participant bot. Registration, news and check-in are coming soon."
+  hello: "👋 Hi! This is the <b>Business Cup 2.0</b> participant bot."
   welcome: |-
-    🎉 <b>{name}, you're on the Business Cup 2.0 participant list!</b>
+    🎉 <b>{name}, congrats on passing the selection!</b>
+
+    You're officially in <b>Business Cup 2.0</b>, with 24 hours ahead to turn an idea into a product 🚀
 
     {team_line}
+    📍 <b>Venue:</b> Nazarbayev University
+    🗓 <b>Date:</b> November 14–15
 
-    Here you'll get announcements, reminders, attendance confirmation and check-in at the entrance. Everything is in the menu below 👇
-  welcome_team: "Team: <b>{team}</b>"
-  welcome_solo: "You're participating solo — you can team up on site."
-  welcome_back: "Welcome back, {name}! The menu is below 👇"
-  games_hint: "While you wait — jump into the games: the photo hunt and the expedition are already open 🎮"
+    If you still haven't joined our <a href="{channel}">Telegram channel</a>, we <b>strongly recommend</b> it. All the main news will be there!
+
+    #FromZeroToProductIn24h with AIESEC
+  welcome_menu: |-
+    <b>What's waiting for you in this bot?</b>
+
+    📢 <b><i>Announcements</i></b>, so you don't miss a thing.
+
+    🙌 <b><i>Attendance confirmation</i></b>, when the time comes.
+
+    ✅ <b><i>Check-in</i></b> at the entrance in a couple of seconds.
+
+    ✉️ <b><i>Questions</i></b> to the organizers right here.
+
+    It's all in the menu below 👇
+  welcome_team: "👥 <b>Team:</b> {team}"
+  welcome_solo: "🙋 <b>Team:</b> solo for now, you can team up on site"
+  channel_button: "📣 Join the channel"
+  welcome_back: "👋 Welcome back, {name}! It's all in the menu below."
+  games_hint: "🎮 <b>While you wait</b>, jump into the games: the photo hunt and the expedition are already open!"
   ask_contact: |-
-    This bot is for selected Business Cup 2.0 participants.
+    👋 Hi! This bot is for <b>Business Cup 2.0</b> participants.
 
-    If you were selected, tap the button below and the bot will match your phone number with your application. The easiest way is the personal link from your email.
+    If you passed the selection, tap the button below and we'll match your number with your application. The personal link from your email works too.
   contact_button: "📱 Share contact"
   not_found: |-
-    We couldn't find you on the participant list 😔
+    😔 We couldn't find you on the participant list.
 
-    If this is a mistake, contact the organizers: {contact}
-  foreign_contact: "Please share <b>your own</b> contact with the button below, not someone else's."
+    If this is a mistake, message us: {contact}
+  foreign_contact: "🙏 We need <b>your own</b> contact. Send it with the button below."
   token_taken: |-
-    This link is already linked to another Telegram account.
+    🔒 This link is already linked to another Telegram account.
 
-    If it's your link, contact the organizers: {contact}
+    If it's your link, message us: {contact}
   account_taken: |-
-    Your Telegram is already linked to another participant ({name}).
+    🔒 Your Telegram is already linked to another participant ({name}).
 
-    If this is a mistake, contact the organizers: {contact}
+    If this is a mistake, message us: {contact}
   ambiguous: |-
-    We found several applications with this number and couldn't link automatically.
+    🧐 We found several applications with this number, so we couldn't link you automatically.
 
-    Open the bot with the personal link from your email or contact the organizers: {contact}
-  too_many_attempts: "Too many attempts. Try again in {minutes} min or contact the organizers: {contact}"
-  only_registered: "This is available to participants only. Tap /start to link your account."
+    Open the bot with the personal link from your email or message us: {contact}
+  too_many_attempts: "⏳ Too many attempts. Try again in {minutes} min or message us: {contact}"
+  only_registered: "🔒 This is for participants only. Tap /start to get in."
 
 menu:
   checkin: "✅ Check in"
@@ -47,7 +66,7 @@ menu:
   language: "🌐 Русский"
   games: "🎮 Games"
   games_chat: "💬 Group chat"
-  unknown: "Sorry, I didn't get that 🙂 Pick an item from the menu below."
+  unknown: "🤔 Didn't quite get that. Pick an item from the menu below 👇"
   language_switched: "Language: English 🇬🇧"
 
 status:
@@ -57,52 +76,60 @@ status:
   solo: "Team: solo"
   you: " (you)"
   team_legend: "<i>✅ in the bot · ⏳ hasn't opened the bot yet</i>"
-  attendance: "“Are you coming?” answer: <b>{answer}</b>"
-  attendance_none: "The “Are you coming?” poll hasn't started yet or you haven't answered."
-  checkins: "\nCheck-in:"
-  checked_at: "✅ checked in at {time}"
+  attendance: "Coming to the event: <b>{answer}</b>"
+  attendance_none: "The “Are you coming?” poll hasn't started yet, or there's no answer so far."
+  checkins: "\n<b>Check-in:</b>"
+  checked_at: "✅ checked in, {time}"
   not_checked: "—"
 
 content:
-  schedule: "🗓 The schedule will be published closer to the event. Business Cup 2.0 takes place on November 14–15."
+  schedule: |-
+    🗓 <b>The schedule</b> will be here closer to the event.
+
+    For now, save the dates: <b>November 14–15</b>, Nazarbayev University.
   location: "📍 <b>Nazarbayev University</b>\nAstana, 53 Kabanbay Batyr Ave"
-  faq: "❓ Answers to common questions are coming soon. Meanwhile, ask your own with “✉️ Ask a question”."
-  contacts: "☎️ Organizers: {contact}"
+  faq: |-
+    ❓ <b>FAQ</b> is coming here soon.
+
+    Got a question already? Tap “✉️ Ask a question”.
+  contacts: |-
+    ☎️ <b>Organizers:</b> {contact}
+    📣 <b>Channel:</b> {channel}
 
 question:
-  prompt: "Send your question in one message (a photo is fine). The organizers will reply right here in the bot."
+  prompt: "✉️ Send your question in one message, a photo is fine. We'll reply right here in the bot!"
   cancel: "Cancel"
-  cancelled: "OK, cancelled."
-  sent: "✅ Your question was sent to the organizers. The answer will come here."
-  unsupported: "Please send text or a photo with a caption."
-  too_long: "Too long — please keep it under {limit} characters."
-  rate_limited: "You've asked several questions in a row. Please wait {minutes} min 🙏"
-  no_admin_chat: "Questions aren't accepted right now. Contact the organizers directly: {contact}"
+  cancelled: "OK, cancelled 👌"
+  sent: "✅ Question sent! The answer will come here."
+  unsupported: "🙏 Please send text or a photo with a caption."
+  too_long: "😅 A bit too long. Please keep it under {limit} characters."
+  rate_limited: "⏳ That's a lot of questions in a row. Wait {minutes} min and we'll continue 🙏"
+  no_admin_chat: "Questions aren't accepted here right now. Message us directly: {contact}"
   answer: "💬 <b>Reply from the organizers</b>\n\n{answer}"
 
 poll:
-  not_participant: "This poll is for participants only. Tap /start to link your account."
-  closed: "The poll is closed — answers are no longer accepted."
-  saved: "Saved: {answer}. You can change it until the deadline."
-  ask_reason: "Sorry to hear that 😔 Could you tell us why? It helps us. Write one message or skip."
+  not_participant: "🔒 This poll is for participants only. Tap /start to get in."
+  closed: "⌛ The poll is closed, we're no longer taking answers."
+  saved: "✅ Saved: {answer}. You can change it until the deadline."
+  ask_reason: "Sorry to hear that 😔 Could you tell us what's in the way? Write one message or skip."
   skip: "Skip"
-  reason_thanks: "Thank you, noted 🙏"
-  reason_skipped: "OK, no reason."
+  reason_thanks: "Thanks, noted 🙏"
+  reason_skipped: "OK, no reason 👌"
 
 checkin:
-  ok_team: "✅ <b>You are checked in!</b> Day {day}.\nTeam {team}: {present}/{total} here."
-  ok_solo: "✅ <b>You are checked in!</b> Day {day}. Have a great hackathon!"
-  bingo: "🎲 Bingo is open — your card is waiting in the games bot."
+  ok_team: "✅ <b>You're checked in!</b> Day {day}.\n👥 Team {team}: {present}/{total} here."
+  ok_solo: "✅ <b>You're checked in!</b> Day {day}.\n\nHave a great hackathon 🚀"
+  bingo: "🎲 <b>Bingo is open!</b> Your card is waiting in the games bot."
   open_bingo: "🎲 Open bingo"
-  already: "You are already checked in at {time} 👌"
-  expired: "⏱ The QR code has expired — scan the screen at the entrance again."
-  closed: "Check-in is closed right now. If you are at the entrance, ask a volunteer."
-  need_link: "Almost done! Let us link your account first: open the personal link from your email or tap “📱 Share contact” below — and I will check you in right away."
-  too_many: "Too many attempts. Please ask a volunteer at the entrance or tap the button below."
+  already: "👌 You're already checked in, time: {time}."
+  expired: "⏱ The QR code has expired. Scan the screen at the entrance again."
+  closed: "⚪ Check-in is closed right now. If you're at the entrance, ask a volunteer."
+  need_link: "Almost there! Let's link your account first: open the personal link from your email or tap “📱 Share contact” below, and we'll check you in right away."
+  too_many: "⏳ Too many attempts. Ask a volunteer at the entrance or tap the button below."
   call_organizer: "🙋 Call an organizer"
-  called: "We told the organizers — someone will come to you. Please wait at the entrance 🙏"
-  phone_mismatch: "If you are at the entrance and your Telegram number differs from the application, call an organizer and they will check you in manually."
-  scan_with_camera: "Point your phone camera at the QR on the screen at the entrance — Telegram will open the bot and check you in."
+  called: "🙋 The organizers know, someone will come to you. Please wait at the entrance 🙏"
+  phone_mismatch: "If you're at the entrance and your Telegram number doesn't match your application, call an organizer and they'll check you in manually."
+  scan_with_camera: "📷 Point your phone camera at the QR on the screen at the entrance. Telegram will open the bot and check you in."
 
 commands:
   start: "Start / link your account"
@@ -110,4 +137,4 @@ commands:
   status: "My status"
 
 errors:
-  generic: "Something went wrong 😔 We're already on it. Please try again a bit later."
+  generic: "😔 Something went wrong. We're on it, please try again a bit later."

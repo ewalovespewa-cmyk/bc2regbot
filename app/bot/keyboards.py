@@ -62,6 +62,12 @@ def games_keyboard(settings: Settings, lang: str) -> InlineKeyboardMarkup | None
     return InlineKeyboardMarkup(inline_keyboard=[row]) if row else None
 
 
+def channel_keyboard(settings: Settings, lang: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=t("start.channel_button", lang), url=settings.channel_link)]]
+    )
+
+
 def answer_question_keyboard(question_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text="✍️ Ответить", callback_data=f"q:answer:{question_id}")]]

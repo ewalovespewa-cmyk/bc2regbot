@@ -8,7 +8,7 @@ from aiogram.types import Message, ReplyKeyboardRemove, User
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.bot.keyboards import contact_keyboard, games_keyboard, main_menu
+from app.bot.keyboards import channel_keyboard, contact_keyboard, games_keyboard, main_menu
 from app.bot.states import LinkStates
 from app.config import Settings
 from app.db.models import Participant
@@ -48,7 +48,11 @@ async def send_welcome(message: Message, participant: Participant, settings: Set
             if team is None or team.is_solo
             else t("start.welcome_team", lang, team=html.escape(team_display_name(team, lang)))
         )
-        await message.answer(t("start.welcome", lang, name=name, team_line=team_line), reply_markup=main_menu(lang))
+        await message.answer(
+            t("start.welcome", lang, name=name, team_line=team_line, channel=settings.channel_link),
+            reply_markup=channel_keyboard(settings, lang),
+        )
+        await message.answer(t("start.welcome_menu", lang), reply_markup=main_menu(lang))
         if games := games_keyboard(settings, lang):
             await message.answer(t("start.games_hint", lang), reply_markup=games)
     else:

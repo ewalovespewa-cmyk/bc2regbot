@@ -77,7 +77,7 @@ async def _seed_checkins(session):
 async def test_tables_and_excel(session):
     await _seed_checkins(session)
     tables = await all_tables(session, "bc_bot", "Asia/Almaty")
-    assert [t.name for t in tables] == ["Статус бота", "Чекин День 1", "Чекин День 2"]
+    assert [t.name for t in tables] == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
     assert len(tables[0].rows) == 3 and len(tables[1].rows) == 3 and len(tables[2].rows) == 1
     assert tables[2].rows[0][6] == "волонтёр"
 
@@ -85,7 +85,7 @@ async def test_tables_and_excel(session):
     import io
 
     wb = load_workbook(io.BytesIO(tables_to_xlsx(tables)))
-    assert wb.sheetnames == ["Статус бота", "Чекин День 1", "Чекин День 2"]
+    assert wb.sheetnames == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
     assert parse_xlsx(tables_to_xlsx(tables))[0]["Ссылка-приглашение"].startswith("https://t.me/bc_bot?start=")
 
 
@@ -102,7 +102,7 @@ async def test_push_to_sheet_writes_all_tabs(session, monkeypatch):
 
     monkeypatch.setattr("app.services.sheet_sync.SheetsClient", FakeClient)
     count = await push_status_to_sheet(session, Settings(_env_file=None, sheet_id="x", google_service_account_json="{}"))
-    assert count == 3 and written == ["Статус бота", "Чекин День 1", "Чекин День 2"]
+    assert count == 3 and written == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
 
 
 async def test_reset_and_delete_day(session):
@@ -230,13 +230,13 @@ async def test_list_mode_every_row_is_access_and_removed_rows_lose_it(session, m
     sheet = {"rows": _passed_rows(ROW_A, ROW_B)}
 
     class FakeClient:
-        last_read_title = "Прошли отбор"
+        last_read_title = "Прошли отбор (BOT)"
 
         def __init__(self, settings):
             pass
 
         async def read_rows(self, worksheet):
-            assert worksheet == "Прошли отбор"
+            assert worksheet == "Прошли отбор (BOT)"
             return sheet["rows"]
 
     monkeypatch.setattr(sheet_sync, "SheetsClient", FakeClient)
@@ -267,7 +267,7 @@ async def test_list_mode_guard_against_wiped_tab(session, monkeypatch):
     state = {"rows": _passed_rows(*rows)}
 
     class FakeClient:
-        last_read_title = "Прошли отбор"
+        last_read_title = "Прошли отбор (BOT)"
 
         def __init__(self, settings):
             pass

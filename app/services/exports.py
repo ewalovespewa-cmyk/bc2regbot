@@ -30,8 +30,8 @@ def _fmt(dt: datetime | None, tz: ZoneInfo, pattern: str = "%d.%m %H:%M") -> str
 
 
 def checkin_tab_name(day: EventDay) -> str:
-    # Google Sheets не любит в названиях листов []:*?/\ и длину > 100.
-    return re.sub(r"[\[\]:*?/\\]", " ", f"Чекин {day.label}")[:100]
+    # Google Sheets не любит в названиях листов []:*?/\ и длину > 100. Суффикс (BOT) — вкладка принадлежит боту.
+    return re.sub(r"[\[\]:*?/\\]", " ", f"Чекин {day.label}")[:94] + " (BOT)"
 
 
 async def _attendance(session: AsyncSession) -> dict[int, tuple[str, str | None, str]]:
@@ -48,7 +48,7 @@ async def _attendance(session: AsyncSession) -> dict[int, tuple[str, str | None,
     return {pid: (label, reason, source) for pid, label, reason, source in rows}
 
 
-async def passed_table(session: AsyncSession, bot_username: str, timezone: str, name: str = "Статус бота") -> Table:
+async def passed_table(session: AsyncSession, bot_username: str, timezone: str, name: str = "Статус бота (BOT)") -> Table:
     """Вкладка «Статус бота»: строка = отобранный участник. Отсюда берут ссылку для письма."""
     tz = ZoneInfo(timezone)
     days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
@@ -117,7 +117,7 @@ async def checkin_table(session: AsyncSession, day: EventDay, timezone: str) -> 
     return Table(checkin_tab_name(day), header, rows)
 
 
-async def all_tables(session: AsyncSession, bot_username: str, timezone: str, passed_name: str = "Статус бота") -> list[Table]:
+async def all_tables(session: AsyncSession, bot_username: str, timezone: str, passed_name: str = "Статус бота (BOT)") -> list[Table]:
     tables = [await passed_table(session, bot_username, timezone, passed_name)]
     for day in (await session.scalars(select(EventDay).order_by(EventDay.date))).all():
         tables.append(await checkin_table(session, day, timezone))

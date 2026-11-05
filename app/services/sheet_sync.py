@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.services.exports import all_tables
 from app.services.importer import ImportAborted, ImportReport, TeamsReport, assign_teams, import_applications
-from app.services.sources import Row, SheetsClient
+from app.services.sources import Row, SheetMissing, SheetsClient
 
 
 async def import_rows(
@@ -29,11 +29,15 @@ async def import_rows(
 
 async def import_from_sheet(session: AsyncSession, settings: Settings) -> tuple[ImportReport, TeamsReport | None]:
     client = SheetsClient(settings)
-    rows = await client.read_rows(settings.sheet_applications_worksheet)
+    try:
+        rows = await client.read_rows(settings.sheet_applications_worksheet)
+    except SheetMissing:
+        await client.create_source_tab(settings.sheet_applications_worksheet)
+        rows = []
     if not rows:
         raise ImportAborted(
-            f"Лист «{client.last_read_title}» в Google-таблице пустой. Положите туда заявки "
-            "(шапка + строки, как в таблице кандидатов) — или назовите лист с заявками «Кандидаты»."
+            f"Лист «{client.last_read_title}» в Google-таблице пустой. Положите туда прошедших отбор "
+            "(строки в том же формате, что и у кандидатов)."
         )
     try:
         report = await import_rows(

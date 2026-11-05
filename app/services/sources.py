@@ -141,29 +141,37 @@ class SheetsClient:
         raise AssertionError("unreachable")
 
     SOURCE_NAMES = ("кандидаты", "candidates", "заявки", "applications")
-    PASSED_ALIASES = ("прошли отбор", "прошедшие", "отобранные", "прошедшие отбор", "selected")
+    PASSED_ALIASES = ("прошли отбор (bot)", "прошли отбор", "прошедшие", "отобранные", "прошедшие отбор", "selected")
+    # Формат таблицы кандидатов: такую шапку получает новая вкладка-источник, если копировать её неоткуда.
+    SOURCE_HEADER = (
+        "Состояние", "Имя", "Почта", "Метка", "Participation type", "Position in team", "Team name", "Phone number",
+        "Telegram", "University", "Year of study", "Major", "Interested in a career at Zimran", "Вложения",
+        "Нужно внимание", "Создано", "ID заявки", "LinkedIn / CV", "Previous AIESEC project", "Career interests",
+    )
 
     def _worksheet(self, name: str):
         """Лист-источник заявок. Без имени: вкладка «Кандидаты» (или «Заявки»), иначе первая вкладка,
-        которая не принадлежит боту («Статус бота», «Чекин …», «calls»)."""
+        которая не принадлежит боту («… (BOT)», «Статус бота», «Чекин …», «calls»)."""
         spreadsheet = self._open()
         sheets = spreadsheet.worksheets()
         if name:
-            wanted = {name.strip().lower()}
-            if name.strip().lower() in self.PASSED_ALIASES:
-                wanted |= set(self.PASSED_ALIASES)
+            wanted = name.strip().lower()
             for ws in sheets:
-                if ws.title.strip().lower() in wanted:
+                if ws.title.strip().lower() == wanted:
                     return ws
+            if wanted in self.PASSED_ALIASES:
+                for ws in sheets:
+                    if ws.title.strip().lower() in self.PASSED_ALIASES:
+                        return ws
             titles = ", ".join(f"«{ws.title}»" for ws in sheets)
             raise SheetMissing(f"В Google-таблице нет вкладки «{name}». Есть: {titles}. Создайте её и перенесите туда прошедших.")
         for ws in sheets:
             if ws.title.strip().lower() in self.SOURCE_NAMES:
                 return ws
-        own = {self.settings.sheet_status_worksheet.lower(), "calls"}
+        own = {self.settings.sheet_status_worksheet.lower(), "статус бота", "calls"}
         for ws in sheets:
             title = ws.title.strip().lower()
-            if title not in own and not title.startswith("чекин "):
+            if title not in own and not title.startswith("чекин ") and not title.endswith("(bot)"):
                 return ws
         return sheets[0]
 
@@ -184,6 +192,19 @@ class SheetsClient:
             return rows
 
         return await self._call(fetch, f"прочитать лист «{worksheet or 'первый'}»")
+
+    async def create_source_tab(self, name: str) -> None:
+        """Создаёт пустую вкладку-источник с шапкой как у листа кандидатов — туда команда переносит прошедших."""
+
+        def create() -> None:
+            spreadsheet = self._open()
+            source = next((ws for ws in spreadsheet.worksheets() if ws.title.strip().lower() in self.SOURCE_NAMES), None)
+            header = (source.row_values(1) if source else []) or list(self.SOURCE_HEADER)
+            ws = spreadsheet.add_worksheet(name, rows=1000, cols=len(header))
+            ws.update([header], "A1", value_input_option="RAW")
+            self.last_read_title = ws.title
+
+        await self._call(create, f"создать лист «{name}»")
 
     async def write_tables(self, tables: list[Any]) -> None:
         """Перезаписывает несколько листов (объекты с полями name, header, rows) — по одному пакету на лист."""

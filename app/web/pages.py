@@ -98,20 +98,20 @@ async def dashboard_data(request: web.Request) -> web.Response:
                 (await session.scalars(select(Checkin.participant_id).where(Checkin.event_day_id == day.id))).all()
             )
             rows = await session.execute(
-                select(Team.name, Team.is_solo, Participant.full_name, Participant.id)
+                select(Team.name, Team.is_solo, Participant.full_name, Participant.id, Participant.participation_type)
                 .join(Participant, Participant.team_id == Team.id)
                 .where(Participant.is_selected)
                 .order_by(Team.name, Participant.full_name)
             )
             teams: dict[str, dict] = {}
-            for name, is_solo, full_name, pid in rows:
-                key = f"Looking For Team · {full_name}" if is_solo else name
+            for name, is_solo, full_name, pid, ptype in rows:
+                key = f"{team_display_name(None, participation_type=ptype)} · {full_name}" if is_solo else name
                 team = teams.setdefault(key, {"name": key, "solo": is_solo, "present": 0, "total": 0, "members": []})
                 team["total"] += 1
                 team["present"] += pid in checked_ids
                 team["members"].append({"name": full_name, "here": pid in checked_ids})
             recent = await session.execute(
-                select(Checkin.created_at, Checkin.method, Participant.full_name, Participant.team_id)
+                select(Checkin.created_at, Checkin.method, Participant.full_name, Participant.team_id, Participant.participation_type)
                 .join(Participant, Participant.id == Checkin.participant_id)
                 .where(Checkin.event_day_id == day.id)
                 .order_by(Checkin.created_at.desc())
@@ -133,10 +133,10 @@ async def dashboard_data(request: web.Request) -> web.Response:
                     {
                         "time": at.astimezone(tz).strftime("%H:%M"),
                         "name": name,
-                        "team": team_display_name(team_names.get(team_id)),
+                        "team": team_display_name(team_names.get(team_id), participation_type=ptype),
                         "method": method.value,
                     }
-                    for at, method, name, team_id in recent
+                    for at, method, name, team_id, ptype in recent
                 ],
             }
     return web.json_response(payload, headers=NO_CACHE)

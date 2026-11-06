@@ -26,7 +26,7 @@ from app.db.models import (
     Team,
 )
 from app.services import segments
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name
 from app.services.settings_store import ATTENDANCE_POLL_SENT, claim_setting
 
 ATTENDANCE_OPTIONS = [
@@ -280,7 +280,7 @@ async def call_list(session: AsyncSession, poll: Poll | None) -> tuple[list[str]
             why = "ответил «Пока думаю»"
         else:
             continue
-        rows.append([p.full_name, p.phone or p.phone_raw or "", p.email, team_display_name(p.team), why,
+        rows.append([p.full_name, p.phone or p.phone_raw or "", p.email, participant_team_name(p), why,
                      f"@{p.telegram_username}" if p.telegram_username else ""])
     return header, rows
 

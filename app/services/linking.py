@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.models import Participant
 from app.i18n import pick_lang
 from app.services import outbox
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name
 
 
 class LinkStatus(StrEnum):
@@ -86,7 +86,7 @@ async def _link(session: AsyncSession, participant: Participant, user: TelegramU
             "telegram_user_id": user.id,
             "participant_id": participant.id,
             "full_name": participant.full_name,
-            "team": team_display_name(participant.team, "en"),
+            "team": participant_team_name(participant),
             "linked_at": participant.linked_at.isoformat(),
         },
     )

@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import Settings
 from app.db.models import Checkin, CheckinMethod, EventDay, Participant, Team
 from app.services import checkin_codes, outbox
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name
 
 
 class CheckinStatus(StrEnum):
@@ -116,7 +116,7 @@ async def record_checkin(
             {
                 "telegram_user_id": participant.telegram_user_id,
                 "participant_id": participant.id,
-                "team": team_display_name(participant.team, "en"),
+                "team": participant_team_name(participant),
                 "day": day.date.isoformat(),
                 "day_label": day.label,
                 "method": method.value,

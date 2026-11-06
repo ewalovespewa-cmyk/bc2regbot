@@ -134,6 +134,51 @@ async def test_bot_status_table(session):
     col = {h: i for i, h in enumerate(header)}
     by_email = {r[col["Почта"]]: r for r in rows}
     assert set(by_email) == {"aru@mail.com", "dana@mail.com", "timur@mail.com"}
-    assert by_email["timur@mail.com"][col["Команда"]] == "Looking For Team"
+    assert by_email["timur@mail.com"][col["Команда"]] == "Solo Participant"
     assert "Ссылка-приглашение" not in col
     assert by_email["aru@mail.com"][col["Открыл бота"]] == "нет"
+
+
+TEAM_KINDS_CSV = (
+    "Participation type,Full name,Email,Phone,Team name\n"
+    "Already have a team,Aru,aru@mail.com,87011112233,Rockets\n"
+    "Solo participant,Timur,timur@mail.com,87053334455,\n"
+    "Looking for a team to join,Dana,dana@mail.com,87022223344,\n"
+    ",Literal Solo,lit1@mail.com,87022223345,Solo\n"
+    ",Literal Looking,lit2@mail.com,87022223346,Looking for team\n"
+    ",No Data,none@mail.com,87022223347,\n"
+)
+
+
+async def _labels(session):
+    from app.services.importer import participant_team_name
+
+    session.expire_all()
+    people = (await session.scalars(select(Participant))).all()
+    return {p.email.split("@")[0]: participant_team_name(p) for p in people}
+
+
+async def test_team_label_follows_participation_type(session):
+    await import_applications(session, parse_csv(TEAM_KINDS_CSV.encode()), assume_selected=True)
+    await session.commit()
+    assert await _labels(session) == {
+        "aru": "Rockets",
+        "timur": "Solo Participant",
+        "dana": "Looking For Team",
+        "lit1": "Solo Participant",
+        "lit2": "Looking For Team",
+        "none": "Looking For Team",
+    }
+    assert await session.scalar(select(func.count()).select_from(Team).where(Team.is_solo.is_(False))) == 1  # только Rockets
+
+
+async def test_real_team_name_wins_over_type(session):
+    """Организаторы подобрали команду: она сразу видна, а «Solo Leveling» — это настоящее название."""
+    rows = (
+        "Participation type,Full name,Email,Phone,Team name\n"
+        "Looking for a team to join,Aru,aru@mail.com,87011112233,Rockets\n"
+        "Already have a team,Dana,dana@mail.com,87022223344,Solo Leveling\n"
+    )
+    await import_applications(session, parse_csv(rows.encode()), assume_selected=True)
+    await session.commit()
+    assert await _labels(session) == {"aru": "Rockets", "dana": "Solo Leveling"}

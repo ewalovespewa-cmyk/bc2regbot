@@ -6,20 +6,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, EventDay, Participant, Role
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name
 from app.services.roles import has_role
 from app.services.status import attendance_answer
 
 
 def short_line(p: Participant) -> str:
-    team = team_display_name(p.team)
+    team = participant_team_name(p)
     return f"{p.full_name} · {team}"
 
 
 async def participant_card(session: AsyncSession, p: Participant, role: Role | None, timezone: str) -> str:
     tz = ZoneInfo(timezone)
     esc = html.escape
-    lines = [f"🪪 <b>{esc(p.full_name)}</b>", f"Команда: {esc(team_display_name(p.team))}"]
+    lines = [f"🪪 <b>{esc(p.full_name)}</b>", f"Команда: {esc(participant_team_name(p))}"]
     if p.team and not p.team.is_solo:
         mates = (
             await session.scalars(

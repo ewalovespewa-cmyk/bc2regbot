@@ -99,7 +99,9 @@ async def push_status_to_sheet(session: AsyncSession, settings: Settings, *, for
         if force or stale or fingerprint != _fingerprint(table):
             changed.append(table)
     if changed:
-        await SheetsClient(settings).write_tables(changed)
+        client = SheetsClient(settings)
+        await client.write_tables(changed)
+        await client.remove_stale_checkin_tabs({table.name for table in tables})
         for table in changed:
             _last_written[(settings.sheet_id, table.name)] = (_fingerprint(table), now)
     return len(tables[0].rows)

@@ -21,7 +21,8 @@ start:
 
     Всё уже в меню ниже 👇
   welcome_team: "👥 <b>Team:</b> {team}"
-  welcome_solo: "🙋 <b>Team:</b> Looking For Team. Мы подберём тебе команду, stay tuned!"
+  welcome_solo: "🙋 <b>Team:</b> Solo Participant"
+  welcome_looking: "🙋 <b>Team:</b> Looking For Team. Мы подберём тебе команду, stay tuned!"
   channel_button: "📣 Вступить в канал"
   welcome_back: "👋 С возвращением, {name}! Всё в меню ниже."
   games_hint: "🎮 <b>Пока ждёшь проект</b>, заходи в игры: фотохант и экспедиция уже открыты!"
@@ -67,7 +68,6 @@ status:
   title: "👤 <b>Мой статус</b>"
   name: "Имя: <b>{name}</b>"
   team: "Команда: <b>{team}</b>"
-  solo: "Команда: Looking For Team"
   you: " (ты)"
   attendance: "Подтверждение участия: <b>{answer}</b>"
   checkins: "\n<b>Чекин:</b>"

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, CheckinMethod, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name
 
 YES, NO = "да", "нет"
 ROW_COLORS = {"yes": "C6EFCE", "no": "FFC7CE", "maybe": "FFEB9C"}  # ответ на опрос → заливка строки
@@ -79,7 +79,7 @@ async def passed_table(session: AsyncSession, timezone: str, name: str = "Ста
                 p.email,
                 p.phone or p.phone_raw or "",
                 f"@{p.tg_username_form}" if p.tg_username_form else "",
-                team_display_name(p.team),
+                participant_team_name(p),
                 p.team_role or "",
                 p.university or "",
                 YES if p.telegram_user_id else NO,
@@ -108,7 +108,7 @@ async def checkin_table(session: AsyncSession, day: EventDay, timezone: str) -> 
         [
             _fmt(c.created_at, tz, "%H:%M:%S"),
             p.full_name,
-            team_display_name(p.team),
+            participant_team_name(p),
             p.phone or p.phone_raw or "",
             p.email,
             f"@{p.telegram_username}" if p.telegram_username else "",

@@ -21,7 +21,8 @@ start:
 
     It's all in the menu below 👇
   welcome_team: "👥 <b>Team:</b> {team}"
-  welcome_solo: "🙋 <b>Team:</b> Looking For Team. We'll team you up, stay tuned!"
+  welcome_solo: "🙋 <b>Team:</b> Solo Participant"
+  welcome_looking: "🙋 <b>Team:</b> Looking For Team. We'll team you up, stay tuned!"
   channel_button: "📣 Join the channel"
   welcome_back: "👋 Welcome back, {name}! It's all in the menu below."
   games_hint: "🎮 <b>While you wait</b>, jump into the games: the photo hunt and the expedition are already open!"
@@ -67,7 +68,6 @@ status:
   title: "👤 <b>My status</b>"
   name: "Name: <b>{name}</b>"
   team: "Team: <b>{team}</b>"
-  solo: "Team: Looking For Team"
   you: " (you)"
   attendance: "Attendance confirmation: <b>{answer}</b>"
   checkins: "\n<b>Check-in:</b>"

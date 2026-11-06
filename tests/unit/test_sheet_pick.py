@@ -120,3 +120,12 @@ def test_row_color_requests():
     assert red["cell"]["userEnteredFormat"]["backgroundColor"] == {"red": 1.0, "green": 0.0, "blue": 0.0}
     assert green["range"]["startRowIndex"] == 3 and green["range"]["sheetId"] == 7
     assert _row_color_requests(7, 5, []) == []
+
+
+async def test_stale_checkin_tabs_removed_only_for_bot():
+    tabs = [SimpleNamespace(title=t) for t in ("Кандидаты", "Статус бота (BOT)", "Чекин 05.11 (BOT)", "Чекин День 1 (BOT)", "Чекин вручную")]
+    client = _client([])
+    removed = []
+    client._spreadsheet = SimpleNamespace(worksheets=lambda: tabs, del_worksheet=lambda ws: removed.append(ws.title))
+    assert await client.remove_stale_checkin_tabs({"Статус бота (BOT)", "Чекин День 1 (BOT)"}) == ["Чекин 05.11 (BOT)"]
+    assert removed == ["Чекин 05.11 (BOT)"]

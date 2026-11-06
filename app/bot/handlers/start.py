@@ -15,7 +15,7 @@ from app.db.models import Participant
 from app.i18n import t
 from app.bot.checkin_flow import call_organizer_keyboard, finish_pending, handle_code
 from app.services import checkin_codes, ratelimit, security
-from app.services.importer import team_display_name
+from app.services.importer import is_solo_type, team_display_name
 from app.services.linking import (
     LinkResult,
     LinkStatus,
@@ -44,7 +44,7 @@ async def send_welcome(message: Message, participant: Participant, settings: Set
     if first_time:
         team = participant.team
         team_line = (
-            t("start.welcome_solo", lang)
+            t("start.welcome_solo" if is_solo_type(participant.participation_type) else "start.welcome_looking", lang)
             if team is None or team.is_solo
             else t("start.welcome_team", lang, team=html.escape(team_display_name(team, lang)))
         )

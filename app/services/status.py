@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption
 from app.i18n import t
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name, team_display_name
 
 
 async def attendance_answer(session: AsyncSession, participant_id: int, lang: str) -> str | None:
@@ -32,7 +32,7 @@ async def build_status(session: AsyncSession, participant: Participant, lang: st
 
     team = participant.team
     if team is None or team.is_solo:
-        lines.append(t("status.solo", lang))
+        lines.append(t("status.team", lang, team=html.escape(participant_team_name(participant))))
     else:
         members = (
             await session.scalars(

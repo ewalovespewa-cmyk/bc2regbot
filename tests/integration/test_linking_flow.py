@@ -193,7 +193,7 @@ async def test_account_held_by_deselected_record_moves_to_active_one(h, session)
 def test_first_message_wording():
     from app.i18n import t
 
-    solo = t("start.welcome_solo", "en")
+    solo = t("start.welcome_looking", "en")
     assert "Looking For Team" in solo and "team you up" in solo and "stay tuned" in solo and "on site" not in solo
     text = t("start.welcome", "en", name="Amira", team_line=solo, channel="https://t.me/business_cup_2026")
     assert text.endswith("All the main news will be there!")
@@ -254,3 +254,23 @@ async def test_finalists_tab_is_created_when_missing(session, monkeypatch):
     settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
     assert await sheet_sync.sync_finalists(session, settings) == (0, [])
     assert made == ["Финал (BOT)"]
+
+
+async def test_status_and_welcome_show_participation_type(h, session):
+    await h.text(DANA, "/start DANAtoken001")
+    solo = Participant(email="solo@mail.com", full_name="Solo Person", phone="+77044445566", invite_token="SOLOtoken001",
+                       participation_type="Solo participant")
+    looking = Participant(email="look@mail.com", full_name="Look Person", phone="+77055556677", invite_token="LOOKtoken001",
+                          participation_type="Looking for a team to join")
+    session.add_all([solo, looking])
+    await session.commit()
+
+    await h.text(5001, "/start SOLOtoken001")
+    assert "Solo Participant" in h.session.texts(5001)[0] and "team you up" not in h.session.texts(5001)[0]
+    await h.text(5001, "👤 Мой статус")
+    assert "Команда: <b>Solo Participant</b>" in h.session.last_text(5001)
+
+    await h.text(5002, "/start LOOKtoken001")
+    assert "Looking For Team" in h.session.texts(5002)[0] and "stay tuned" in h.session.texts(5002)[0]
+    await h.text(5002, "👤 Мой статус")
+    assert "Команда: <b>Looking For Team</b>" in h.session.last_text(5002)

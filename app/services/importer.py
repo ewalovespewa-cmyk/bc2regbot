@@ -47,6 +47,12 @@ TEXT_FIELDS = (
     "aiesec_project",
 )
 SOLO_PREFIX = "solo:"
+SOLO_LABEL = "Solo Participant"
+LOOKING_LABEL = "Looking For Team"
+SOLO_TYPE = "Solo participant"  # значения колонки Participation type
+LOOKING_TYPE = "Looking for a team to join"
+SOLO_NAMES = {"solo", "solo participant", "соло"}
+LOOKING_NAMES = {"looking for team", "looking for a team", "looking for a team to join", "lft"}
 MAX_ERRORS_IN_REPORT = 20
 
 
@@ -87,10 +93,38 @@ def solo_team_name(email: str) -> str:
     return f"{SOLO_PREFIX}{email}"
 
 
-def team_display_name(team: Team | None, lang: str = "ru") -> str:
+def is_solo_type(participation_type: str | None) -> bool:
+    value = (participation_type or "").lower()
+    return "solo" in value or "соло" in value
+
+
+def is_looking_type(participation_type: str | None) -> bool:
+    value = (participation_type or "").lower()
+    return "look" in value or "ищ" in value
+
+
+def team_display_name(team: Team | None, lang: str = "ru", participation_type: str | None = None) -> str:
     if team is None or team.is_solo:
-        return "Looking For Team"
+        return SOLO_LABEL if is_solo_type(participation_type) else LOOKING_LABEL
     return team.name
+
+
+def participant_team_name(participant: Participant) -> str:
+    """Название команды либо Solo Participant / Looking For Team — по Participation type из заявки."""
+    return team_display_name(participant.team, participation_type=participant.participation_type)
+
+
+def _resolve_team(participation_type: str | None, team_name: str) -> tuple[str | None, str]:
+    """(Participation type, настоящая команда). «Solo» и «Looking for team» в Team name — не название команды.
+
+    Настоящее название в Team name главнее типа: так подобранная организаторами команда сразу видна человеку.
+    """
+    name = team_name.lower()
+    if name in SOLO_NAMES:
+        return participation_type or SOLO_TYPE, ""
+    if name in LOOKING_NAMES:
+        return participation_type or LOOKING_TYPE, ""
+    return participation_type, team_name
 
 
 class _Columns:
@@ -233,6 +267,9 @@ async def import_applications(
             **{f: (row.get(resolved[f], "").strip() or None) if resolved[f] else None for f in TEXT_FIELDS},
         }
 
+        team_name = row.get(team_col, "").strip() if team_col else ""
+        values["participation_type"], team_name = _resolve_team(values["participation_type"], team_name)
+
         if participant is None:
             token = generate_invite_token()
             while token in taken_tokens:
@@ -254,16 +291,18 @@ async def import_applications(
             else:
                 report.unchanged += 1
 
-        team_name = row.get(team_col, "").strip() if team_col else ""
         if team_name:
             team, created = await _get_or_create_team(session, teams, team_name)
             report.teams_created += created
             if participant.team_id != team.id:
                 participant.team_id = team.id
         elif participant.team_id is None:
-            # Команды ещё нет (или задают её отдельным листом) — участник пока соло-команда.
+            # Команды нет (или её задают отдельным листом) — личная запись, подпись берётся из Participation type.
             team, created = await _get_or_create_team(session, teams, solo_team_name(email), is_solo=True)
             participant.team_id = team.id
+            ptype = values["participation_type"]
+            if ptype and not is_solo_type(ptype) and not is_looking_type(ptype):
+                report.warnings.append(f"строка {line_no} ({email}): «{ptype}», но Team name пустой")
 
     if deselect_missing:
         # Источник — полный список прошедших: кого в нём больше нет, тому закрываем доступ.

@@ -223,6 +223,21 @@ class SheetsClient:
 
         await self._call(create, f"создать лист «{name}»")
 
+    async def remove_stale_checkin_tabs(self, keep: set[str]) -> list[str]:
+        """Удаляет вкладки «Чекин … (BOT)» удалённых дней. Трогает только вкладки бота."""
+
+        def remove() -> list[str]:
+            spreadsheet = self._open()
+            stale = [
+                ws for ws in spreadsheet.worksheets()
+                if ws.title.startswith("Чекин ") and ws.title.endswith("(BOT)") and ws.title not in keep
+            ]
+            for ws in stale:
+                spreadsheet.del_worksheet(ws)
+            return [ws.title for ws in stale]
+
+        return await self._call(remove, "удалить вкладки прошлых дней")
+
     async def write_tables(self, tables: list[Any]) -> None:
         """Перезаписывает несколько листов (объекты с полями name, header, rows) — по одному пакету на лист."""
         for table in tables:

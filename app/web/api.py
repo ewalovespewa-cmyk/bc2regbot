@@ -7,7 +7,7 @@ from sqlalchemy import select
 
 from app.db.models import Checkin, EventDay, Participant
 from app.services.checkin import local_today
-from app.services.importer import team_display_name
+from app.services.importer import participant_team_name
 from app.web.keys import SESSIONMAKER, SETTINGS
 
 
@@ -51,7 +51,7 @@ async def participant_status(request: web.Request) -> web.Response:
             "activated": True,
             "participant_id": p.id,
             "full_name": p.full_name,
-            "team": team_display_name(p.team, "en"),
+            "team": participant_team_name(p),
             "checkins": checkins,
             "checked_in_today": any(c["day"] == today for c in checkins),
         }

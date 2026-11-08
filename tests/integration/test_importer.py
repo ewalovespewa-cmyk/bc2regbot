@@ -96,9 +96,16 @@ async def test_separate_teams_sheet_moves_solo_into_team(session):
 
     # Пустая соло-команда удалена, а повторный импорт без колонки Team команду не сбрасывает.
     assert await session.scalar(select(func.count()).select_from(Team).where(Team.is_solo)) == 0
-    await run(session, parse_csv(CSV.encode()))
+    without_team_column = "\n".join(line.rsplit(",", 1)[0] for line in CSV.strip().split("\n")) + "\n"
+    await run(session, parse_csv(without_team_column.encode()))
     session.expire_all()
     assert (await participants(session))["timur@mail.com"].team.name == "Comets"
+
+    # А таблица с колонкой Team — источник правды: Solo с пустым Team name снова без команды.
+    await run(session, parse_csv(CSV.encode()))
+    session.expire_all()
+    timur = (await participants(session))["timur@mail.com"]
+    assert timur.team.is_solo
 
 
 async def test_custom_column_map_and_case_insensitive_headers(session):
@@ -182,3 +189,15 @@ async def test_real_team_name_wins_over_type(session):
     await import_applications(session, parse_csv(rows.encode()), assume_selected=True)
     await session.commit()
     assert await _labels(session) == {"aru": "Rockets", "dana": "Solo Leveling"}
+
+
+async def test_old_test_team_dropped_for_solo(session):
+    """Запись из тестовой таблицы была в «Test Team», а в новой таблице человек Solo с пустым Team name."""
+    old = "Participation type,Full name,Email,Phone,Team name\nAlready have a team,Tester,t@mail.com,87011112233,Test Team\n"
+    await import_applications(session, parse_csv(old.encode()), assume_selected=True)
+    await session.commit()
+    new = "Participation type,Full name,Email,Phone,Team name\nSolo participant,Tester,t@mail.com,87011112233,\n"
+    report = await import_applications(session, parse_csv(new.encode()), assume_selected=True)
+    await session.commit()
+    assert (await _labels(session))["t"] == "Solo Participant" and report.updated == 1
+    assert await session.scalar(select(func.count()).select_from(Team).where(Team.name == "Test Team")) == 1  # команда осталась, но пустая

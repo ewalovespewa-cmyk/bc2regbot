@@ -296,12 +296,15 @@ async def import_applications(
             report.teams_created += created
             if participant.team_id != team.id:
                 participant.team_id = team.id
-        elif participant.team_id is None:
-            # Команды нет (или её задают отдельным листом) — личная запись, подпись берётся из Participation type.
-            team, created = await _get_or_create_team(session, teams, solo_team_name(email), is_solo=True)
-            participant.team_id = team.id
+        else:
             ptype = values["participation_type"]
-            if ptype and not is_solo_type(ptype) and not is_looking_type(ptype):
+            without_team = is_solo_type(ptype) or is_looking_type(ptype)
+            # Таблица с колонкой команды — источник правды: Solo и Looking с пустым Team name выходят из старой
+            # команды. Без такой колонки команды задают отдельным листом, их не трогаем.
+            if participant.team_id is None or (team_col and without_team):
+                team, created = await _get_or_create_team(session, teams, solo_team_name(email), is_solo=True)
+                participant.team_id = team.id
+            if team_col and ptype and not without_team:
                 report.warnings.append(f"строка {line_no} ({email}): «{ptype}», но Team name пустой")
 
     if deselect_missing:

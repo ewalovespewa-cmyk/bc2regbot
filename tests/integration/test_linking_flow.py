@@ -53,7 +53,8 @@ async def test_link_by_token(h, session):
     p = await participant(session, "aru@mail.com")
     assert p.telegram_user_id == ARU and p.telegram_username == "aru_b" and p.lang == "en"
     welcome = h.session.texts(ARU)[0]
-    assert "Aru" in welcome and "Rockets" in welcome and "congrats" in welcome and "t.me/business_cup_2026" in welcome
+    assert "Aru" in welcome and "congrats" in welcome and "t.me/business_cup_2026" in welcome
+    assert "Rockets" not in welcome and "Team:" not in welcome  # команду в приветствии не показываем
     assert any("photo hunt" in t for t in h.session.texts(ARU))  # кнопка в бот игр
     assert await session.scalar(select(func.count()).select_from(OutboundEvent)) == 1  # событие для бота игр
 
@@ -125,7 +126,8 @@ async def test_status_and_pages(h, session):
     h.session.clear()
     await h.text(ARU, "👤 Мой статус")
     status = h.session.last_text(ARU)
-    assert "Aru Bekova" in status and "Rockets" in status and "• Dana Ospan" in status
+    assert "Aru Bekova" in status and "Первый этап отбора пройден" in status and "t.me/business_cup_2026" in status
+    assert "Rockets" not in status and "Dana" not in status and "Команда" not in status
     assert "Опрос" not in status and "в боте" not in status and "✅ Dana" not in status
 
     await h.text(ARU, "✉️ Задать вопрос")  # кнопка со старой клавиатуры: просто показываем меню заново
@@ -193,10 +195,8 @@ async def test_account_held_by_deselected_record_moves_to_active_one(h, session)
 def test_first_message_wording():
     from app.i18n import t
 
-    solo = t("start.welcome_looking", "en")
-    assert "Looking For Team" in solo and "team you up" in solo and "stay tuned" in solo and "on site" not in solo
-    text = t("start.welcome", "en", name="Amira", team_line=solo, channel="https://t.me/business_cup_2026")
-    assert text.endswith("All the main news will be there!")
+    text = t("start.welcome", "en", name="Amira", channel="https://t.me/business_cup_2026")
+    assert text.endswith("All the main news will be there!") and "Team" not in text
 
 
 def test_participants_are_not_told_about_personal_links():
@@ -256,21 +256,18 @@ async def test_finalists_tab_is_created_when_missing(session, monkeypatch):
     assert made == ["Финал (BOT)"]
 
 
-async def test_status_and_welcome_show_participation_type(h, session):
-    await h.text(DANA, "/start DANAtoken001")
+async def test_status_shows_first_stage_without_team(h, session):
     solo = Participant(email="solo@mail.com", full_name="Solo Person", phone="+77044445566", invite_token="SOLOtoken001",
                        participation_type="Solo participant")
-    looking = Participant(email="look@mail.com", full_name="Look Person", phone="+77055556677", invite_token="LOOKtoken001",
-                          participation_type="Looking for a team to join")
-    session.add_all([solo, looking])
+    session.add(solo)
     await session.commit()
 
     await h.text(5001, "/start SOLOtoken001")
-    assert "Solo Participant" in h.session.texts(5001)[0] and "team you up" not in h.session.texts(5001)[0]
+    assert "Solo Participant" not in h.session.texts(5001)[0]
     await h.text(5001, "👤 Мой статус")
-    assert "Команда: <b>Solo Participant</b>" in h.session.last_text(5001)
+    status = h.session.last_text(5001)
+    assert "Первый этап отбора пройден" in status and "Solo Participant" not in status and "Команда" not in status
 
-    await h.text(5002, "/start LOOKtoken001")
-    assert "Looking For Team" in h.session.texts(5002)[0] and "stay tuned" in h.session.texts(5002)[0]
-    await h.text(5002, "👤 Мой статус")
-    assert "Команда: <b>Looking For Team</b>" in h.session.last_text(5002)
+    await h.text(5001, "🌐 English")
+    await h.text(5001, "👤 My status")
+    assert "First selection stage passed" in h.session.last_text(5001)

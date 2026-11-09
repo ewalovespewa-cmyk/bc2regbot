@@ -5,7 +5,6 @@ start:
 
     Теперь ты официально в <b>Business Cup 2.0</b>, и впереди 24 часа, за которые идея превратится в продукт 🚀
 
-    {team_line}
     📍 <b>Venue:</b> Nazarbayev University
     🗓 <b>Date:</b> 14–15 ноября
 
@@ -20,9 +19,6 @@ start:
     ✅ <b><i>Чекин</i></b> на входе за пару секунд.
 
     Всё уже в меню ниже 👇
-  welcome_team: "👥 <b>Team:</b> {team}"
-  welcome_solo: "🙋 <b>Team:</b> Solo Participant"
-  welcome_looking: "🙋 <b>Team:</b> Looking For Team. Мы подберём тебе команду, stay tuned!"
   channel_button: "📣 Вступить в канал"
   welcome_back: "👋 С возвращением, {name}! Всё в меню ниже."
   games_hint: "🎮 <b>Пока ждёшь проект</b>, заходи в игры: фотохант и экспедиция уже открыты!"
@@ -67,8 +63,9 @@ menu:
 status:
   title: "👤 <b>Мой статус</b>"
   name: "Имя: <b>{name}</b>"
-  team: "Команда: <b>{team}</b>"
-  you: " (ты)"
+  passed: |-
+    🎉 <b>Первый этап отбора пройден!</b>
+    Следи за новостями в нашем <a href="{channel}">Telegram-канале</a>, скоро расскажем, что дальше 🚀
   attendance: "Подтверждение участия: <b>{answer}</b>"
   checkins: "\n<b>Чекин:</b>"
   checked_at: "✅ есть отметка, {time}"

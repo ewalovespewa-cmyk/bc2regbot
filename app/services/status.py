@@ -1,4 +1,4 @@
-"""Экран «Мой статус»: имя, команда и состав, ответ на опрос явки, чекины по дням."""
+"""Экран «Мой статус»: имя, отметка о первом этапе отбора, ответ на опрос явки, чекины по дням."""
 import html
 from zoneinfo import ZoneInfo
 
@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption
 from app.i18n import t
-from app.services.importer import participant_team_name, team_display_name
 
 
 async def attendance_answer(session: AsyncSession, participant_id: int, lang: str) -> str | None:
@@ -26,25 +25,16 @@ async def attendance_answer(session: AsyncSession, participant_id: int, lang: st
     return label_en if lang == "en" and label_en else label_ru
 
 
-async def build_status(session: AsyncSession, participant: Participant, lang: str, timezone: str) -> str:
+async def build_status(
+    session: AsyncSession, participant: Participant, lang: str, timezone: str, channel_link: str
+) -> str:
     tz = ZoneInfo(timezone)
-    lines = [t("status.title", lang), t("status.name", lang, name=html.escape(participant.full_name))]
-
-    team = participant.team
-    if team is None or team.is_solo:
-        lines.append(t("status.team", lang, team=html.escape(participant_team_name(participant))))
-    else:
-        members = (
-            await session.scalars(
-                select(Participant)
-                .where(Participant.team_id == team.id, Participant.is_selected)
-                .order_by(Participant.full_name)
-            )
-        ).all()
-        lines.append(t("status.team", lang, team=html.escape(team_display_name(team, lang))))
-        for m in members:
-            you = t("status.you", lang) if m.id == participant.id else ""
-            lines.append(f"  • {html.escape(m.full_name)}{you}")
+    lines = [
+        t("status.title", lang),
+        t("status.name", lang, name=html.escape(participant.full_name)),
+        "",
+        t("status.passed", lang, channel=channel_link),
+    ]
 
     answer = await attendance_answer(session, participant.id, lang)
     if answer:

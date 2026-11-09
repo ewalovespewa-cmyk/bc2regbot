@@ -30,7 +30,7 @@ async def cmd_menu(message: Message, participant: Participant) -> None:
 @router.message(menu_text("status"))
 @router.message(Command("status"))
 async def show_status(message: Message, session: AsyncSession, settings: Settings, participant: Participant) -> None:
-    text = await build_status(session, participant, participant.lang, settings.timezone)
+    text = await build_status(session, participant, participant.lang, settings.timezone, settings.channel_link)
     await message.answer(text, reply_markup=main_menu(participant.lang))
 
 

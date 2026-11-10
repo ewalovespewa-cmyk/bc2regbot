@@ -107,13 +107,14 @@ async def test_pending_checkin_after_linking_by_contact(h, session, world):
     assert await session.scalar(select(func.count()).select_from(Checkin).where(Checkin.participant_id == pid)) == 1
 
 
-async def test_phone_mismatch_at_entrance_offers_help(h, session, world):
+async def test_phone_mismatch_at_entrance_sends_to_volunteer(h, session, world):
     await h.text(4444, f"/start ci_{code_for(world.id)}")
     await h.contact(4444, "+77770000000")
-    help_msg = h.session.sent(4444)[-1]
-    assert help_msg.reply_markup.inline_keyboard[0][0].callback_data == "ci:help"
-    await h.callback(4444, 4444, "ci:help")
-    assert "помощь на входе" in h.session.last_text(-100)
+    hint = h.session.sent(4444)[-1]
+    assert "волонтёр" in hint.text and hint.reply_markup is None  # без кнопки
+    h.session.clear()
+    await h.callback(4444, 4444, "ci:help")  # кнопка из старого сообщения: только подсказка, без алерта админам
+    assert h.session.sent(-100) == []
 
 
 async def test_web_app_scanner(h, session, world):

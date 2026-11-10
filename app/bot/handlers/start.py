@@ -13,7 +13,7 @@ from app.bot.states import LinkStates
 from app.config import Settings
 from app.db.models import Participant
 from app.i18n import t
-from app.bot.checkin_flow import call_organizer_keyboard, finish_pending, handle_code
+from app.bot.checkin_flow import finish_pending, handle_code
 from app.services import checkin_codes, ratelimit, security
 from app.services.linking import (
     LinkResult,
@@ -104,7 +104,7 @@ async def _handle_result(
     if result.status == LinkStatus.NOT_FOUND:
         await message.answer(t("start.not_found", lang, contact=contact), reply_markup=ReplyKeyboardRemove())
         if pending:  # человек на входе, а номер не совпал — пусть позовёт волонтёра
-            await message.answer(t("checkin.phone_mismatch", lang), reply_markup=call_organizer_keyboard(lang))
+            await message.answer(t("checkin.phone_mismatch", lang))
     elif result.status == LinkStatus.TOKEN_TAKEN:
         p = result.participant
         await message.answer(t("start.token_taken", lang, contact=contact), reply_markup=ReplyKeyboardRemove())

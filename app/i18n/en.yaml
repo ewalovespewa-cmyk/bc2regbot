@@ -105,10 +105,9 @@ checkin:
   expired: "⏱ The QR code has expired. Scan the screen at the entrance again."
   closed: "⚪ Check-in is closed right now. If you're at the entrance, ask a volunteer."
   need_link: "Almost there! Let's link your account first: tap “📱 Share contact” below, and we'll check you in right away."
-  too_many: "⏳ Too many attempts. Ask a volunteer at the entrance or tap the button below."
-  call_organizer: "🙋 Call an organizer"
-  called: "🙋 The organizers know, someone will come to you. Please wait at the entrance 🙏"
-  phone_mismatch: "If you're at the entrance and your Telegram number doesn't match your application, call an organizer and they'll check you in manually."
+  too_many: "⏳ Too many attempts. Please ask a volunteer at the entrance."
+  ask_volunteer: "🙋 Please ask a volunteer at the entrance, they'll check you in manually."
+  phone_mismatch: "If you're at the entrance and your Telegram number doesn't match your application, ask a volunteer and they'll check you in manually."
   scan_with_camera: "📷 Point your phone camera at the QR on the screen at the entrance. Telegram will open the bot and check you in."
 
 commands:

@@ -17,7 +17,7 @@ from app.bot.keyboards import main_menu, menu_text
 from app.config import Settings
 from app.db.models import Checkin, CheckinMethod, EventDay, Participant, Role, SecurityEvent
 from app.i18n import t
-from app.services import checkin_codes, ratelimit, security
+from app.services import checkin_codes, security
 from app.services.audit import log_admin_action
 from app.services.checkin import (
     CheckinStatus,
@@ -60,22 +60,9 @@ async def on_checkin_button_without_webapp(message: Message, participant: Partic
 
 
 @router.callback_query(F.data == "ci:help")
-async def on_call_organizer(
-    callback: CallbackQuery, session: AsyncSession, bot: Bot, redis: Redis, settings: Settings,
-    participant: Participant | None, lang: str,
-) -> None:
-    user = callback.from_user
-    if not await ratelimit.hit(redis, f"help:{user.id}", 3, 600):
-        await callback.answer(t("checkin.called", lang), show_alert=True)
-        return
-    who = participant.full_name if participant else (user.full_name or "")
-    await security.report(
-        session, bot=bot, redis=redis, settings=settings, kind=security.HELP_AT_ENTRANCE,
-        telegram_user_id=user.id, username=user.username, participant_id=participant.id if participant else None,
-        name=who, linked="да" if participant else "нет (номер не совпал с заявкой)",
-    )
-    await callback.message.answer(t("checkin.called", participant.lang if participant else lang))
-    await callback.answer()
+async def on_old_call_organizer(callback: CallbackQuery, participant: Participant | None, lang: str) -> None:
+    """Кнопку «Позвать организатора» убрали, но она осталась в старых сообщениях: отправляем к волонтёру."""
+    await callback.answer(t("checkin.ask_volunteer", participant.lang if participant else lang), show_alert=True)
 
 
 # ---------------------------------------------------------------- волонтёр: из карточки участника

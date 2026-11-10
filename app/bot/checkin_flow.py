@@ -29,12 +29,6 @@ def bingo_keyboard(settings: Settings, lang: str) -> InlineKeyboardMarkup | None
     )
 
 
-def call_organizer_keyboard(lang: str) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=t("checkin.call_organizer", lang), callback_data="ci:help")]]
-    )
-
-
 async def reply_result(message: Message, result: CheckinResult, participant: Participant, session: AsyncSession, settings: Settings) -> None:
     lang = participant.lang
     if result.status in (CheckinStatus.OK, CheckinStatus.ALREADY):
@@ -68,7 +62,7 @@ async def _too_many_invalid(message: Message, session, bot, redis, settings, lan
     key = f"badcode:{message.from_user.id}"
     if await ratelimit.hit(redis, key, *INVALID_LIMIT):
         return False
-    await message.answer(t("checkin.too_many", lang), reply_markup=call_organizer_keyboard(lang))
+    await message.answer(t("checkin.too_many", lang))
     await security.report(
         session, bot=bot, redis=redis, settings=settings, kind=security.INVALID_CODE_FLOOD,
         telegram_user_id=message.from_user.id, username=message.from_user.username,

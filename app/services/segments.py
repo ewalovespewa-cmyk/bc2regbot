@@ -3,12 +3,15 @@
 Сегмент — JSON вида {"type": "...", ...параметры}; хранится в broadcasts.segment.
 Базовое условие для всех: участник отобран, привязал Telegram и не заблокировал бота.
 """
+import re
+from dataclasses import dataclass, field
 from typing import Any
 
 from sqlalchemy import Select, exists, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption, Team
+from app.services.normalize import normalize_email, normalize_phone, normalize_username
 
 ALL = "all"
 ATTENDANCE = "attendance"  # answer: yes | no | maybe | none
@@ -18,6 +21,7 @@ CONFIRMED_NOT_CHECKED_IN = "confirmed_not_checked_in"  # day_id — «Мы те�
 TEAM = "team"  # team_id
 SOLO = "solo"
 SELF = "self"  # тестовая отправка только себе
+CUSTOM = "custom"  # participant_ids — «Кастом»: люди по списку
 POLL_PENDING = "poll_pending"  # poll_id — для напоминаний: не ответил или ответ «ещё не решил»
 
 ANSWER_TITLES = {"yes": "ответили «Приду»", "no": "ответили «Не смогу»", "maybe": "ответили «Пока думаю»", "none": "не ответили на опрос"}
@@ -83,6 +87,8 @@ async def segment_query(session: AsyncSession, spec: dict[str, Any]) -> Select |
     if kind == SOLO:
         solo = exists().where(Team.id == Participant.team_id, Team.is_solo).correlate(Participant)
         return stmt.where(Participant.team_id.is_(None) | solo)
+    if kind == CUSTOM:
+        return stmt.where(Participant.id.in_(spec.get("participant_ids") or []))
     raise ValueError(f"Неизвестный сегмент: {kind}")
 
 
@@ -118,4 +124,42 @@ async def describe(session: AsyncSession, spec: dict[str, Any]) -> str:
         return "без команды (Solo и Looking For Team)"
     if kind == SELF:
         return "тест: только мне"
+    if kind == CUSTOM:
+        return f"кастом: {len(spec.get('participant_ids') or [])} чел. по списку"
     return kind
+
+
+@dataclass
+class CustomPick:
+    participants: list[Participant] = field(default_factory=list)  # все найденные, без повторов
+    missing: list[str] = field(default_factory=list)  # строки списка, по которым никого не нашли
+
+    @property
+    def reachable(self) -> list[Participant]:
+        return [p for p in self.participants if p.telegram_user_id and not p.is_blocked_bot]
+
+
+async def resolve_people(session: AsyncSession, text: str) -> CustomPick:
+    """Список «@username, почта или телефон» (через запятую, точку с запятой или с новой строки) → участники."""
+    pick = CustomPick()
+    seen: set[int] = set()
+    for item in (part.strip() for part in re.split(r"[,;\n]+", text)):
+        if not item:
+            continue
+        if "@" in item.strip("@") and "." in item.split("@")[-1]:
+            cond = Participant.email == normalize_email(item)
+        elif len(re.sub(r"\D", "", item)) >= 10 and (phone := normalize_phone(item)):
+            cond = Participant.phone == phone
+        elif username := normalize_username(item):
+            cond = (Participant.tg_username_form == username) | (Participant.telegram_username == username)
+        else:
+            pick.missing.append(item)
+            continue
+        found = (await session.scalars(select(Participant).where(Participant.is_selected, cond).order_by(Participant.id))).all()
+        if not found:
+            pick.missing.append(item)
+        for p in found:
+            if p.id not in seen:
+                seen.add(p.id)
+                pick.participants.append(p)
+    return pick

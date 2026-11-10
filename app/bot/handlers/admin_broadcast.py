@@ -49,6 +49,7 @@ class BroadcastStates(StatesGroup):
     buttons = State()
     segment = State()
     team_query = State()
+    custom_list = State()
     schedule_time = State()
 
 
@@ -196,7 +197,7 @@ async def _ask_segment(message: Message, state: FSMContext, session: AsyncSessio
         rows.append([_btn(f"Отмечены · {d.label}", f"bc:seg:ci:{d.id}"), _btn(f"Не отмечены · {d.label}", f"bc:seg:nci:{d.id}")])
         rows.append([_btn(f"💌 «Ждём тебя»: придут, но не отмечены · {d.label}", f"bc:seg:wait:{d.id}")])
     rows.append([_btn("🏷 Конкретная команда", "bc:seg:team"), _btn("🧍 Без команды", "bc:seg:solo")])
-    rows.append([_btn("🧪 Тест: только мне", "bc:seg:self")])
+    rows.append([_btn("👥 Кастом", "bc:seg:custom"), _btn("🧪 Тест: только мне", "bc:seg:self")])
     await message.answer("Кому отправляем?", reply_markup=_kb(*rows))
 
 
@@ -243,6 +244,49 @@ async def on_team_query(message: Message, state: FSMContext, session: AsyncSessi
     await message.answer(
         "Выбери команду:", reply_markup=_kb(*[[_btn(t.name[:60], f"bc:seg:teamid:{t.id}")] for t in teams])
     )
+
+
+@router.callback_query(F.data == "bc:seg:custom", RoleFilter(Role.ADMIN))
+async def on_custom_segment(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(BroadcastStates.custom_list)
+    await callback.message.answer(
+        "👥 <b>Кастом</b>\nПришли, кому отправить: @username, почты или телефоны — через запятую или каждый с новой строки."
+    )
+    await callback.answer()
+
+
+CUSTOM_SHOW = 40  # сколько имён показывать в каждом списке
+
+
+def _names(people) -> str:
+    shown = ", ".join(html.escape(p.full_name) for p in people[:CUSTOM_SHOW])
+    return shown + (f" и ещё {len(people) - CUSTOM_SHOW}" if len(people) > CUSTOM_SHOW else "")
+
+
+@router.message(BroadcastStates.custom_list, F.text, ~F.text.startswith("/"), RoleFilter(Role.ADMIN))
+async def on_custom_list(message: Message, state: FSMContext, session: AsyncSession, settings: Settings, bot: Bot) -> None:
+    b = await _draft(session, state)
+    if b is None:
+        await message.answer("Черновик потерян, начни заново: /broadcast")
+        return
+    pick = await segments.resolve_people(session, message.text)
+    reachable = pick.reachable
+    lines = [f"👥 <b>Кастом</b>: нашёл {len(pick.participants)}, получат {len(reachable)}."]
+    if reachable:
+        lines.append(f"✅ Получат: {_names(reachable)}")
+    if unreachable := [p for p in pick.participants if p not in reachable]:
+        lines.append(f"⏳ Не открыли бота или заблокировали его, не получат: {_names(unreachable)}")
+    if pick.missing:
+        lines.append("❓ Не нашёл среди прошедших: " + ", ".join(html.escape(m) for m in pick.missing[:CUSTOM_SHOW]))
+    if not reachable:
+        lines.append("\nНекому отправлять. Пришли другой список или нажми «🔁 Другой сегмент».")
+        await message.answer("\n".join(lines), reply_markup=_kb([_btn("🔁 Другой сегмент", "bc:reseg")]))
+        return
+    b.segment = {"type": segments.CUSTOM, "participant_ids": [p.id for p in reachable]}
+    await session.flush()
+    await state.set_state(BroadcastStates.segment)
+    await message.answer("\n".join(lines))
+    await _preview(message, b, session, settings, bot, message.from_user.id)
 
 
 @router.callback_query(F.data.startswith("bc:seg:"), BroadcastStates.segment, RoleFilter(Role.ADMIN))

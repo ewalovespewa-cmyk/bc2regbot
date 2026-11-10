@@ -434,3 +434,35 @@ async def test_manual_launch_closed_when_scheduled(engine, redis, world, setting
     assert not [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000]
     to_admin = [c.text for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == SUPER]
     assert polls.ATTENDANCE_INTRO in to_admin and any("Ты придёшь?" in t for t in to_admin)
+
+
+async def test_custom_segment_by_list(h, session, world):
+    people = world["people"]
+    people[0].tg_username_form = "person_zero"
+    people[1].phone = "+77011112233"
+    await session.commit()
+
+    await h.callback(SUPER, SUPER, "bc:new")
+    await h.text(SUPER, "Только для своих")
+    await h.callback(SUPER, SUPER, "bc:nobuttons")
+    await h.callback(SUPER, SUPER, "bc:seg:custom")
+    await h.text(SUPER, "@Person_Zero, 8 701 111 22 33\np2@x.kz; p5@x.kz\n@nobody_here")
+    texts = h.session.texts(SUPER)
+    report = next(t for t in texts if "Кастом</b>: нашёл" in t)
+    assert "нашёл 4, получат 3" in report and "Person 5" in report and "nobody_here" in report
+    assert "Получателей: <b>3</b>" in h.session.last_text(SUPER)
+
+    await h.callback(SUPER, SUPER, "bc:send")
+    b = await session.scalar(select(Broadcast).where(Broadcast.status == BroadcastStatus.RUNNING))
+    recipients = set((await session.scalars(select(BroadcastDelivery.chat_id).where(BroadcastDelivery.broadcast_id == b.id))).all())
+    assert recipients == {2000, 2001, 2002}  # Person 5 не открыл бота
+
+
+async def test_custom_segment_nobody_found(h, session):
+    await h.callback(SUPER, SUPER, "bc:new")
+    await h.text(SUPER, "Тест")
+    await h.callback(SUPER, SUPER, "bc:nobuttons")
+    await h.callback(SUPER, SUPER, "bc:seg:custom")
+    await h.text(SUPER, "@nobody_here")
+    assert "Некому отправлять" in h.session.last_text(SUPER)
+    assert await session.scalar(select(func.count()).select_from(Broadcast).where(Broadcast.status != BroadcastStatus.DRAFT)) == 0

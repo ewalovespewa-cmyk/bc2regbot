@@ -111,7 +111,7 @@ async def test_phone_mismatch_at_entrance_sends_to_volunteer(h, session, world):
     await h.text(4444, f"/start ci_{code_for(world.id)}")
     await h.contact(4444, "+77770000000")
     hint = h.session.sent(4444)[-1]
-    assert "волонтёр" in hint.text and hint.reply_markup is None  # без кнопки
+    assert "регистрационной стойке" in hint.text and hint.reply_markup is None  # без кнопки
     h.session.clear()
     await h.callback(4444, 4444, "ci:help")  # кнопка из старого сообщения: только подсказка, без алерта админам
     assert h.session.sent(-100) == []

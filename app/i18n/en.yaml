@@ -103,11 +103,11 @@ checkin:
   open_bingo: "🎲 Open bingo"
   already: "👌 You're already checked in, time: {time}."
   expired: "⏱ The QR code has expired. Scan the screen at the entrance again."
-  closed: "⚪ Check-in is closed right now. If you're at the entrance, ask a volunteer."
+  closed: "⚪ Check-in is closed right now. Please come to the organizers at the registration desk🙏"
   need_link: "Almost there! Let's link your account first: tap “📱 Share contact” below, and we'll check you in right away."
-  too_many: "⏳ Too many attempts. Please ask a volunteer at the entrance."
-  ask_volunteer: "🙋 Please ask a volunteer at the entrance, they'll check you in manually."
-  phone_mismatch: "If you're at the entrance and your Telegram number doesn't match your application, ask a volunteer and they'll check you in manually."
+  too_many: "⏳ Too many attempts. Please come to the organizers at the registration desk🙏"
+  ask_volunteer: "Please come to the organizers at the registration desk🙏"
+  phone_mismatch: "Your Telegram number doesn't match your application. Please come to the organizers at the registration desk🙏"
   scan_with_camera: "📷 Point your phone camera at the QR on the screen at the entrance. Telegram will open the bot and check you in."
 
 commands:

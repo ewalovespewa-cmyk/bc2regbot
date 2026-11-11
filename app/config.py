@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
     error_alert_throttle_seconds: int = 300
+    # Анти-спам: сколько апдейтов от одного человека принимаем за окно (0 — без ограничения).
+    throttle_limit: int = 6
+    throttle_window_seconds: int = 3
 
     # Секреты веб-страниц и интеграций (используются на следующих этапах)
     checkin_secret: str = ""

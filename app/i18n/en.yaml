@@ -117,3 +117,4 @@ commands:
 
 errors:
   generic: "😔 Something went wrong. We're on it, please try again a bit later."
+  too_fast: "⏳ Slow down! Wait a couple of seconds."

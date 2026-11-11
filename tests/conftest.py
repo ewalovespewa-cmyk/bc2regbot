@@ -22,6 +22,7 @@ os.environ.setdefault("BOT_TOKEN", "123456:TEST-TOKEN")
 os.environ.setdefault("WEBHOOK_SECRET", "test-secret")
 os.environ.setdefault("DATABASE_URL", "postgresql://postgres:@127.0.0.1:5432/unused")
 os.environ.setdefault("REDIS_URL", "redis://localhost:6379/0")
+os.environ.setdefault("THROTTLE_LIMIT", "0")
 
 
 def _local_pg_url() -> str:

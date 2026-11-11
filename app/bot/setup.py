@@ -22,6 +22,7 @@ from app.bot.handlers import (
 )
 from app.bot.middlewares.db_session import DbSessionMiddleware
 from app.bot.middlewares.dedup import DedupMiddleware
+from app.bot.middlewares.throttle import ThrottleMiddleware
 from app.bot.middlewares.participant import ParticipantMiddleware
 from app.config import Settings
 
@@ -52,8 +53,9 @@ def create_dispatcher(
     storage = RedisStorage(redis, key_builder=DefaultKeyBuilder(with_bot_id=True), state_ttl=7 * 86400, data_ttl=7 * 86400)
     dp = Dispatcher(storage=storage, redis=redis, sessionmaker=sessionmaker, settings=settings)
 
-    # Порядок важен: сначала отбрасываем дубли, потом открываем сессию БД.
+    # Порядок важен: сначала отбрасываем дубли и спам, потом открываем сессию БД.
     dp.update.outer_middleware(DedupMiddleware(redis, bot.id))
+    dp.update.outer_middleware(ThrottleMiddleware(redis, settings.throttle_limit, settings.throttle_window_seconds))
     dp.update.outer_middleware(DbSessionMiddleware(sessionmaker))
 
     participant_mw = ParticipantMiddleware()

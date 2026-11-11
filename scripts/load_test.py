@@ -44,7 +44,7 @@ def database_url() -> str:
     return server.get_uri().rsplit("/", 1)[0] + "/bc_load"
 
 
-async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0, users_count: int = 300) -> bool:
+async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0, users_count: int = 300, spammers: int = 0) -> bool:
     from aiogram import Bot
     from aiogram.client.session.aiohttp import AiohttpSession
     from aiogram.client.telegram import TelegramAPIServer
@@ -139,9 +139,28 @@ async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0, users_
             await asyncio.sleep(rnd.uniform(0.5, 3))
             await dp.feed_update(bot, start_update(uid, next(update_ids)))
 
+    spam_sent = 0
+
+    def status_update(uid: int) -> Update:
+        msg = Message(message_id=next(update_ids), date=datetime.now(UTC), chat=Chat(id=uid, type="private"),
+                      from_user=User(id=uid, is_bot=False, first_name="Spam", language_code="ru"), text="👤 Мой статус")
+        return Update(update_id=next(update_ids), message=msg)
+
+    async def spammer_flow(uid: int) -> None:
+        # Жмёт «Мой статус» без остановки всё время, пока идёт чекин: ~20 нажатий в секунду.
+        nonlocal spam_sent
+        end = time.monotonic() + duration
+        while time.monotonic() < end:
+            await dp.feed_update(bot, status_update(uid))
+            spam_sent += 1
+            await asyncio.sleep(0.05)
+
     started = time.monotonic()
-    await asyncio.gather(*(participant_flow(uid) for uid in users))
+    await asyncio.gather(*(participant_flow(uid) for uid in users), *(spammer_flow(uid) for uid in users[:spammers]))
     phase1 = time.monotonic() - started
+    if spammers:
+        spam_answered = sum(1 for uid in users[:spammers] for t in fake.sent.get(uid, []) if "Мой статус" in t)
+        print(f"  спам: {spammers} чел. нажали «Мой статус» {spam_sent} раз, бот ответил {spam_answered} раз")
 
     async with sm() as session:
         checkins = await session.scalar(select(func.count()).select_from(Checkin))
@@ -207,12 +226,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tg-delay", type=float, default=0, help="задержка ответа поддельного Telegram, секунды")
     parser.add_argument("--checkin-429", type=int, default=0, help="каждый N-й ответ при чекине получает 429")
+    parser.add_argument("--spammers", type=int, default=0, help="сколько человек всё время жмут «Мой статус»")
     parser.add_argument("--users", type=int, default=300, help="сколько участников приходят на чекин")
     parser.add_argument("--duration", type=float, default=60, help="за сколько секунд прийти 300 участникам")
     args = parser.parse_args()
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    sys.exit(0 if asyncio.run(run(args.duration, args.tg_delay, args.checkin_429, args.users)) else 1)
+    sys.exit(0 if asyncio.run(run(args.duration, args.tg_delay, args.checkin_429, args.users, args.spammers)) else 1)
 
 
 if __name__ == "__main__":

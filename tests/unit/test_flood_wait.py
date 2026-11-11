@@ -49,3 +49,33 @@ async def test_gives_up_after_attempts(sleep):
     with pytest.raises(TelegramRetryAfter):
         await FloodWaitMiddleware()(make_request, None, METHOD)
     assert make_request.await_count == ATTEMPTS
+
+
+def _network_error(cause: Exception):
+    from aiogram.exceptions import TelegramNetworkError
+
+    try:
+        raise TelegramNetworkError(method=METHOD, message="Cannot connect") from cause
+    except TelegramNetworkError as exc:
+        return exc
+
+
+async def test_connection_reset_before_sending_is_retried(sleep):
+    from aiohttp import ClientConnectorError
+    from aiohttp.client_reqrep import ConnectionKey
+
+    key = ConnectionKey("api.telegram.org", 443, True, True, None, None, None)
+    not_connected = _network_error(ClientConnectorError(key, ConnectionResetError(104, "Connection reset by peer")))
+    make_request = AsyncMock(side_effect=[not_connected, "ok"])
+    assert await FloodWaitMiddleware()(make_request, None, METHOD) == "ok"
+    assert make_request.await_count == 2
+
+
+async def test_error_after_sending_is_not_retried(sleep):
+    from aiogram.exceptions import TelegramNetworkError
+    from aiohttp import ServerDisconnectedError
+
+    make_request = AsyncMock(side_effect=_network_error(ServerDisconnectedError()))
+    with pytest.raises(TelegramNetworkError):
+        await FloodWaitMiddleware()(make_request, None, METHOD)
+    assert make_request.await_count == 1  # сообщение могло дойти — не дублируем

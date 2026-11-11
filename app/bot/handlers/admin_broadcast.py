@@ -5,7 +5,6 @@
 сохранить как шаблон. Черновик хранится в БД с первого шага — рестарт ничего не теряет.
 """
 import html
-import json
 import re
 from datetime import UTC, datetime
 from zoneinfo import ZoneInfo
@@ -19,13 +18,13 @@ from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot import albums
 from app.bot.filters import RoleFilter
 from app.config import Settings
 from app.db.models import Broadcast, BroadcastStatus, EventDay, MediaType, Role, Team
 from app.services import segments
 from app.services.audit import log_admin_action
 from app.services.broadcast import (
-    ALBUM_LIMIT,
     CAPTION_LIMIT,
     TEXT_LIMIT,
     cancel_broadcast,
@@ -130,13 +129,6 @@ async def cmd_cancel(message: Message, state: FSMContext, session: AsyncSession)
 # ---------------------------------------------------------------- шаг 1: контент
 
 
-ALBUM_TTL = 3600
-
-
-def _album_key(user_id: int, group_id: str) -> str:
-    return f"bc:album:{user_id}:{group_id}"
-
-
 async def _ask_buttons(message: Message, state: FSMContext, session: AsyncSession, b: Broadcast) -> None:
     session.add(b)
     await session.flush()
@@ -148,55 +140,17 @@ async def _ask_buttons(message: Message, state: FSMContext, session: AsyncSessio
     )
 
 
-async def _collect_album_item(message: Message, redis: Redis) -> None:
-    """Альбом приходит отдельными сообщениями: копим их, а собираем по кнопке «Готово»."""
-    if message.photo:
-        item = {"type": "photo", "file_id": message.photo[-1].file_id}
-    elif message.video:
-        item = {"type": "video", "file_id": message.video.file_id}
-    elif message.document:
-        item = {"type": "document", "file_id": message.document.file_id}
-    else:
-        return
-    if message.caption:
-        item["caption"] = message.html_text
-    key = _album_key(message.from_user.id, message.media_group_id)
-    await redis.rpush(key, json.dumps({"id": message.message_id, **item}))
-    await redis.expire(key, ALBUM_TTL)
-    if await redis.set(f"{key}:asked", "1", nx=True, ex=ALBUM_TTL):
-        await message.answer(
-            "🖼 Получаю альбом. Когда загрузятся все картинки, нажми «Готово».",
-            reply_markup=_kb([_btn("✅ Готово", f"bc:album:{message.media_group_id}")]),
-        )
-
-
 @router.callback_query(F.data.startswith("bc:album:"), BroadcastStates.content, RoleFilter(Role.ADMIN))
 async def on_album_done(callback: CallbackQuery, state: FSMContext, session: AsyncSession, redis: Redis) -> None:
-    key = _album_key(callback.from_user.id, callback.data.split(":", 2)[2])
-    items = sorted((json.loads(raw) for raw in await redis.lrange(key, 0, -1)), key=lambda i: i["id"])
-    if not items:
-        await callback.answer("Альбом не найден, пришли его ещё раз", show_alert=True)
+    items, text, error = await albums.take(redis, prefix="bc", user_id=callback.from_user.id, group_id=callback.data.split(":", 2)[2])
+    if error is None and len(text) > CAPTION_LIMIT:
+        error = f"Подпись длиннее {CAPTION_LIMIT} символов"
+    if error:
+        await callback.answer(error, show_alert=True)
         return
-    kinds = {i["type"] for i in items}
-    if len(items) > ALBUM_LIMIT:
-        await callback.answer(f"В альбоме больше {ALBUM_LIMIT} файлов, Telegram столько не отправит", show_alert=True)
-        return
-    if "document" in kinds and len(kinds) > 1:
-        await callback.answer("Файлы нельзя смешивать с фото и видео в одном альбоме", show_alert=True)
-        return
-    text = next((i["caption"] for i in items if i.get("caption")), "")
-    if len(text) > CAPTION_LIMIT:
-        await callback.answer(f"Подпись длиннее {CAPTION_LIMIT} символов", show_alert=True)
-        return
-    await redis.delete(key)
     await callback.answer()
     plain = re.sub(r"<[^>]+>", "", text).strip().splitlines()[0] if text.strip() else f"Альбом ({len(items)})"
-    b = Broadcast(
-        title=plain[:60],
-        text_html=text,
-        media_group=[{"type": i["type"], "file_id": i["file_id"]} for i in items],
-        created_by=callback.from_user.id,
-    )
+    b = Broadcast(title=plain[:60], text_html=text, media_group=items, created_by=callback.from_user.id)
     await callback.message.answer(f"🖼 Альбом собран: {len(items)} шт.")
     await _ask_buttons(callback.message, state, session, b)
 
@@ -204,7 +158,10 @@ async def on_album_done(callback: CallbackQuery, state: FSMContext, session: Asy
 @router.message(BroadcastStates.content, ~F.text.startswith("/"), RoleFilter(Role.ADMIN))
 async def on_content(message: Message, state: FSMContext, session: AsyncSession, redis: Redis) -> None:
     if message.media_group_id:
-        await _collect_album_item(message, redis)
+        await albums.collect(
+            message, redis, prefix="bc", done_callback="bc:album",
+            hint="🖼 Получаю альбом. Когда загрузятся все картинки, нажми «Готово».",
+        )
         return
     media_type, file_id = None, None
     if message.photo:

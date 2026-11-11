@@ -12,7 +12,7 @@ from app.bot.keyboards import main_menu, menu_text
 from app.config import Settings
 from app.db.models import Participant
 from app.i18n import t
-from app.services.content import get_page
+from app.services.content import get_page, send_page
 from app.services.status import build_status
 
 router = Router(name="menu")
@@ -39,7 +39,7 @@ async def _show_page(message: Message, session: AsyncSession, settings: Settings
     text = page.text_html
     if key == "location" and participant.is_finalist:
         text += "\n" + t("content.location_final", participant.lang)
-    await message.answer(text, reply_markup=main_menu(participant.lang))
+    await send_page(message.bot, message.chat.id, text, page.media_group, main_menu(participant.lang))
     if page.latitude is not None and page.longitude is not None:
         await message.answer_location(page.latitude, page.longitude)
 

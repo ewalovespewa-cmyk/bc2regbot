@@ -48,6 +48,8 @@ class ContentPage(Base):
     text_html: Mapped[str] = mapped_column(Text)
     latitude: Mapped[float | None] = mapped_column(Float)
     longitude: Mapped[float | None] = mapped_column(Float)
+    # Картинки страницы (например, расписание карточками): [{"type": "photo", "file_id": "..."}]
+    media_group: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     updated_by: Mapped[int | None] = mapped_column(BigInteger)
     updated_at: Mapped[datetime] = updated_at_col()
 

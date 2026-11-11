@@ -1,24 +1,27 @@
 """/content: админ редактирует расписание, локацию и контакты прямо в боте.
 
 Новый текст присылается обычным сообщением — форматирование Telegram (жирный, ссылки…)
-сохраняется. Перед сохранением бот показывает предпросмотр. Для локации можно прислать
-геоточку (📎 → Геопозиция).
+сохраняется. Можно прислать картинку или альбом (например, расписание карточками), текст
+тогда берётся из подписи. Перед сохранением бот показывает предпросмотр. Для локации можно
+прислать геоточку (📎 → Геопозиция).
 """
 import html
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from redis.asyncio import Redis
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.bot import albums
 from app.bot.filters import RoleFilter
 from app.config import Settings
 from app.db.models import ContentPage, Role
 from app.services.audit import log_admin_action
-from app.services.content import PAGES, get_page
+from app.services.content import PAGES, get_page, send_page
 
 router = Router(name="admin_content")
 router.message.filter(F.chat.type == "private")
@@ -51,22 +54,25 @@ async def cmd_content(message: Message, state: FSMContext) -> None:
 
 
 @router.callback_query(F.data.startswith("c:edit:"), RoleFilter(Role.ADMIN))
-async def on_edit(callback: CallbackQuery, state: FSMContext, session: AsyncSession, settings: Settings) -> None:
+async def on_edit(callback: CallbackQuery, state: FSMContext, session: AsyncSession, settings: Settings, bot: Bot) -> None:
     _, _, key, lang = callback.data.split(":")
     page = await get_page(session, settings, key, lang)
     custom = await session.get(ContentPage, (key, lang))
     await state.set_state(ContentStates.waiting_text)
-    await state.update_data(key=key, lang=lang, text=None, lat=page.latitude, lon=page.longitude)
+    await state.update_data(key=key, lang=lang, text=None, lat=page.latitude, lon=page.longitude, media=page.media_group)
 
     origin = "задан админом" if custom else "текст по умолчанию"
     extra = "\nДля локации можно также прислать геоточку (📎 → Геопозиция)." if key == "location" else ""
     await callback.message.answer(f"Сейчас ({origin}):")
-    await callback.message.answer(page.text_html)
+    await send_page(bot, callback.message.chat.id, page.text_html, page.media_group)
     buttons = [[_btn("Отмена", "c:cancel")]]
+    if page.media_group:
+        buttons.insert(0, [_btn("🗑 Убрать картинки", "c:nomedia")])
     if custom:
         buttons.insert(0, [_btn("↩️ Вернуть текст по умолчанию", f"c:reset:{key}:{lang}")])
     await callback.message.answer(
-        f"Пришли новый текст для «{TITLES[key]}» ({LANG_FLAGS[lang]}) одним сообщением — форматирование сохранится.{extra}",
+        f"Пришли новый текст для «{TITLES[key]}» ({LANG_FLAGS[lang]}) одним сообщением — форматирование сохранится. "
+        f"Можно прислать картинку или альбом, текст тогда пиши в подписи.{extra}",
         reply_markup=InlineKeyboardMarkup(inline_keyboard=buttons),
     )
     await callback.answer()
@@ -82,16 +88,57 @@ async def on_location(message: Message, state: FSMContext) -> None:
     await message.answer("📍 Точка обновлена. Пришли текст или нажми «Сохранить».", reply_markup=_confirm_keyboard())
 
 
+async def _preview(message: Message, state: FSMContext, bot: Bot) -> None:
+    data = await state.get_data()
+    text = data["text"] if data.get("text") is not None else ""
+    await message.answer("👀 <b>Предпросмотр:</b>")
+    await send_page(bot, message.chat.id, text, data.get("media") or [])
+    await message.answer("Сохранить?", reply_markup=_confirm_keyboard())
+
+
 @router.message(ContentStates.waiting_text, F.text, ~F.text.startswith("/"), RoleFilter(Role.ADMIN))
-async def on_text(message: Message, state: FSMContext) -> None:
+async def on_text(message: Message, state: FSMContext, bot: Bot) -> None:
     text = message.html_text
     if len(text) > MAX_TEXT:
         await message.answer(f"Слишком длинно ({len(text)} символов), максимум {MAX_TEXT}.")
         return
     await state.update_data(text=text)
-    await message.answer("👀 <b>Предпросмотр:</b>")
-    await message.answer(text)
-    await message.answer("Сохранить?", reply_markup=_confirm_keyboard())
+    await _preview(message, state, bot)
+
+
+@router.message(ContentStates.waiting_text, F.photo | F.video | F.document, RoleFilter(Role.ADMIN))
+async def on_media(message: Message, state: FSMContext, bot: Bot, redis: Redis) -> None:
+    if message.media_group_id:
+        await albums.collect(
+            message, redis, prefix="content", done_callback="c:album",
+            hint="🖼 Получаю картинки. Когда загрузятся все, нажми «Готово».",
+        )
+        return
+    await state.update_data(media=[albums.media_item(message)], text=message.html_text if message.caption else "")
+    await _preview(message, state, bot)
+
+
+@router.callback_query(F.data.startswith("c:album:"), ContentStates.waiting_text, RoleFilter(Role.ADMIN))
+async def on_album(callback: CallbackQuery, state: FSMContext, bot: Bot, redis: Redis) -> None:
+    items, caption, error = await albums.take(
+        redis, prefix="content", user_id=callback.from_user.id, group_id=callback.data.split(":", 2)[2]
+    )
+    if error:
+        await callback.answer(error, show_alert=True)
+        return
+    await callback.answer()
+    await state.update_data(media=items, text=caption)
+    await _preview(callback.message, state, bot)
+
+
+@router.callback_query(F.data == "c:nomedia", ContentStates.waiting_text, RoleFilter(Role.ADMIN))
+async def on_no_media(callback: CallbackQuery, state: FSMContext, session: AsyncSession, settings: Settings, bot: Bot) -> None:
+    data = await state.get_data()
+    if data.get("text") is None:
+        await state.update_data(text=(await get_page(session, settings, data["key"], data["lang"])).text_html)
+    await state.update_data(media=[])
+    await callback.answer()
+    await _preview(callback.message, state, bot)
 
 
 def _confirm_keyboard() -> InlineKeyboardMarkup:
@@ -102,20 +149,21 @@ def _confirm_keyboard() -> InlineKeyboardMarkup:
 async def on_save(callback: CallbackQuery, state: FSMContext, session: AsyncSession, settings: Settings) -> None:
     data = await state.get_data()
     key, lang = data["key"], data["lang"]
-    text = data.get("text") or (await get_page(session, settings, key, lang)).text_html
+    text = data["text"] if data.get("text") is not None else (await get_page(session, settings, key, lang)).text_html
     values = dict(
         key=key,
         lang=lang,
         text_html=text,
         latitude=data.get("lat") if key == "location" else None,
         longitude=data.get("lon") if key == "location" else None,
+        media_group=data.get("media") or [],
         updated_by=callback.from_user.id,
     )
     stmt = insert(ContentPage).values(**values)
     await session.execute(
         stmt.on_conflict_do_update(
             index_elements=[ContentPage.key, ContentPage.lang],
-            set_={k: stmt.excluded[k] for k in ("text_html", "latitude", "longitude", "updated_by")},
+            set_={k: stmt.excluded[k] for k in ("text_html", "latitude", "longitude", "media_group", "updated_by")},
         )
     )
     await log_admin_action(session, callback.from_user.id, "edit_content", f"{key}:{lang}")

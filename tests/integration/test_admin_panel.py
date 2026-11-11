@@ -116,3 +116,41 @@ async def test_edit_content(h, session):
     await h.callback(SUPER, SUPER, "c:reset:schedule:ru")
     session.expire_all()
     assert await session.get(ContentPage, ("schedule", "ru")) is None
+
+
+async def test_schedule_as_album(h, session):
+    from aiogram.methods import SendMediaGroup, SendPhoto
+
+    await h.text(SUPER, "/content")
+    await h.callback(SUPER, SUPER, "c:edit:schedule:ru")
+    await h.photo(SUPER, "🗓 Agenda", media_group_id="S1", file_id="day-1")
+    await h.photo(SUPER, None, media_group_id="S1", file_id="day-2")
+    assert sum("Получаю картинки" in t for t in h.session.texts(SUPER)) == 1
+    await h.callback(SUPER, SUPER, "c:album:S1")
+    await h.callback(SUPER, SUPER, "c:save")
+    page = await session.get(ContentPage, ("schedule", "ru"))
+    assert [m["file_id"] for m in page.media_group] == ["day-1", "day-2"] and page.text_html == "🗓 Agenda"
+
+    await h.text(ARU, "/start ARUtoken0001")
+    h.session.clear()
+    await h.text(ARU, "🗓 Расписание")
+    album = [c for c in h.session.sent(ARU) if isinstance(c, SendMediaGroup)]
+    assert len(album) == 1 and [m.media for m in album[0].media] == ["day-1", "day-2"]
+    assert album[0].media[0].caption == "🗓 Agenda"
+
+    # одна картинка без подписи, затем убрать картинки — вернётся текст
+    await h.callback(SUPER, SUPER, "c:edit:schedule:ru")
+    await h.photo(SUPER, file_id="single")
+    await h.callback(SUPER, SUPER, "c:save")
+    h.session.clear()
+    await h.text(ARU, "🗓 Расписание")
+    photos = [c for c in h.session.sent(ARU) if isinstance(c, SendPhoto)]
+    assert len(photos) == 1 and photos[0].photo == "single" and photos[0].reply_markup is not None
+
+    await h.callback(SUPER, SUPER, "c:edit:schedule:ru")
+    await h.callback(SUPER, SUPER, "c:nomedia")
+    await h.text(SUPER, "Расписание текстом")
+    await h.callback(SUPER, SUPER, "c:save")
+    session.expire_all()
+    page = await session.get(ContentPage, ("schedule", "ru"))
+    assert page.media_group == [] and page.text_html == "Расписание текстом"

@@ -44,7 +44,7 @@ def database_url() -> str:
     return server.get_uri().rsplit("/", 1)[0] + "/bc_load"
 
 
-async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0) -> bool:
+async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0, users_count: int = 300) -> bool:
     from aiogram import Bot
     from aiogram.client.session.aiohttp import AiohttpSession
     from aiogram.client.telegram import TelegramAPIServer
@@ -87,7 +87,7 @@ async def run(duration: float, tg_delay: float = 0, checkin_429: int = 0) -> boo
     from app.services.sheet_sync import import_rows
 
     async with sm() as session:
-        await import_rows(session, settings, build_rows())
+        await import_rows(session, settings, build_rows(users_count, (users_count + 2) // 3 + users_count // 10))
         for pid in (await session.scalars(select(Participant.id))).all():
             p = await session.get(Participant, pid)
             p.telegram_user_id = TG_BASE + pid
@@ -207,11 +207,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--tg-delay", type=float, default=0, help="задержка ответа поддельного Telegram, секунды")
     parser.add_argument("--checkin-429", type=int, default=0, help="каждый N-й ответ при чекине получает 429")
+    parser.add_argument("--users", type=int, default=300, help="сколько участников приходят на чекин")
     parser.add_argument("--duration", type=float, default=60, help="за сколько секунд прийти 300 участникам")
     args = parser.parse_args()
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    sys.exit(0 if asyncio.run(run(args.duration, args.tg_delay, args.checkin_429)) else 1)
+    sys.exit(0 if asyncio.run(run(args.duration, args.tg_delay, args.checkin_429, args.users)) else 1)
 
 
 if __name__ == "__main__":

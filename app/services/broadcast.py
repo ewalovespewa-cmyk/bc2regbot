@@ -26,7 +26,14 @@ from aiogram.exceptions import (
     TelegramNotFound,
     TelegramRetryAfter,
 )
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    InputMediaDocument,
+    InputMediaPhoto,
+    InputMediaVideo,
+    Message,
+)
 from sqlalchemy import func, insert, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -110,11 +117,25 @@ def build_markup(buttons: list[dict[str, str]], extra_rows: list[list[InlineKeyb
     return InlineKeyboardMarkup(inline_keyboard=rows) if rows else None
 
 
+ALBUM_MEDIA = {"photo": InputMediaPhoto, "video": InputMediaVideo, "document": InputMediaDocument}
+ALBUM_LIMIT = 10  # больше Telegram в один альбом не принимает
+
+
 async def send_content(
     bot: Bot, chat_id: int, b: Broadcast, *, name: str | None = None, extra_rows=None
 ) -> Message:
     text = render_text(b.text_html, name)
     markup = build_markup(b.buttons or [], extra_rows)
+    if b.media_group:
+        # У альбома не бывает кнопок: их отправляем следующим сообщением.
+        media = [
+            ALBUM_MEDIA[item["type"]](media=item["file_id"], caption=(text or None) if n == 0 else None)
+            for n, item in enumerate(b.media_group)
+        ]
+        sent = await bot.send_media_group(chat_id, media)
+        if markup:
+            await bot.send_message(chat_id, "👇", reply_markup=markup)
+        return sent[0]
     if b.media_type == MediaType.PHOTO:
         return await bot.send_photo(chat_id, b.media_file_id, caption=text or None, reply_markup=markup)
     if b.media_type == MediaType.VIDEO:

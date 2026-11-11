@@ -53,6 +53,8 @@ class Broadcast(Base):
     text_html: Mapped[str | None] = mapped_column(Text)
     media_type: Mapped[MediaType | None] = mapped_column(str_enum(MediaType, "media_type"))
     media_file_id: Mapped[str | None] = mapped_column(String(255))
+    # Альбом: [{"type": "photo" | "video" | "document", "file_id": "..."}]; подпись — text_html у первого
+    media_group: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     buttons: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
     segment: Mapped[dict[str, Any]] = mapped_column(JSONB, server_default=text("'{}'::jsonb"))
     poll_id: Mapped[int | None] = mapped_column(ForeignKey("polls.id", ondelete="SET NULL"))

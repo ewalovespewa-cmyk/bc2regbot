@@ -40,6 +40,12 @@ class FakeSession(BaseSession):
         if chat_id in self.fail_for:
             raise self.fail_for[chat_id]
         returning = getattr(method, "__returning__", None)
+        if returning == list[Message]:
+            return [
+                Message(message_id=next(_message_ids) + 10_000, date=datetime.now(UTC),
+                        chat=Chat(id=int(chat_id), type="private"), caption=getattr(m, "caption", None))
+                for m in method.media
+            ]
         if returning is Message:
             return Message(
                 message_id=next(_message_ids) + 10_000,
@@ -129,10 +135,10 @@ class Harness:
         msg = self._message(user, Chat(id=uid, type="private"), contact=contact)
         await self.feed(Update(update_id=next(_update_ids), message=msg))
 
-    async def photo(self, uid: int, caption: str | None = None) -> None:
+    async def photo(self, uid: int, caption: str | None = None, *, media_group_id: str | None = None, file_id: str = "photo-file-id") -> None:
         user = self.user(uid)
-        photo = [PhotoSize(file_id="photo-file-id", file_unique_id="u1", width=100, height=100)]
-        msg = self._message(user, Chat(id=uid, type="private"), photo=photo, caption=caption)
+        photo = [PhotoSize(file_id=file_id, file_unique_id=file_id, width=100, height=100)]
+        msg = self._message(user, Chat(id=uid, type="private"), photo=photo, caption=caption, media_group_id=media_group_id)
         await self.feed(Update(update_id=next(_update_ids), message=msg))
 
     async def group_reply(self, chat_id: int, uid: int, reply_to_message_id: int, text: str) -> None:

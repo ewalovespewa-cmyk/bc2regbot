@@ -75,8 +75,15 @@ async def on_block_change(event: ChatMemberUpdated, session: AsyncSession) -> No
 
 
 @fallback_router.message()
-async def fallback(message: Message, state: FSMContext, participant: Participant | None, lang: str) -> None:
+async def fallback(
+    message: Message, state: FSMContext, session: AsyncSession, settings: Settings, participant: Participant | None, lang: str
+) -> None:
+    from app.services.roles import get_role
+
     if participant:
         await message.answer(t("menu.unknown", participant.lang), reply_markup=main_menu(participant.lang))
+    elif await get_role(session, settings, message.from_user.id):
+        # Админ посреди рассылки или другого шага прислал не то: подсказываем и не сбиваем его состояние.
+        await message.answer("🤔 Не понял это сообщение. Если делаешь рассылку, следуй подсказке выше. Админка: /admin")
     else:
         await ask_contact(message, state, lang)

@@ -466,3 +466,37 @@ async def test_custom_segment_nobody_found(h, session):
     await h.text(SUPER, "@nobody_here")
     assert "Некому отправлять" in h.session.last_text(SUPER)
     assert await session.scalar(select(func.count()).select_from(Broadcast).where(Broadcast.status != BroadcastStatus.DRAFT)) == 0
+
+
+async def test_album_broadcast(h, session, settings, engine):
+    from aiogram.methods import SendMediaGroup
+
+    await h.callback(SUPER, SUPER, "bc:new")
+    await h.photo(SUPER, "Agenda на выходные", media_group_id="G1", file_id="card-1")
+    await h.photo(SUPER, None, media_group_id="G1", file_id="card-2")
+    texts = h.session.texts(SUPER)
+    assert sum("Получаю альбом" in t for t in texts) == 1  # подсказка одна на весь альбом
+    assert not any("Привет! Это бот" in t for t in texts)  # админу не предлагают привязать контакт
+
+    await h.callback(SUPER, SUPER, "bc:album:G1")
+    await h.text(SUPER, "Программа | https://businesscup.zimran.io")
+    await h.callback(SUPER, SUPER, "bc:seg:all")
+    b = await session.scalar(select(Broadcast).where(Broadcast.created_by == SUPER).order_by(Broadcast.id.desc()))
+    assert [i["file_id"] for i in b.media_group] == ["card-1", "card-2"] and b.text_html == "Agenda на выходные"
+    await h.callback(SUPER, SUPER, "bc:send")
+
+    await engine_mod.run_worker_cycle(h.bot, create_sessionmaker(engine), settings, time_budget=10)
+    albums = [c for c in h.session.calls if isinstance(c, SendMediaGroup) and c.chat_id == 2000]
+    assert len(albums) == 1 and [m.media for m in albums[0].media] == ["card-1", "card-2"]
+    assert albums[0].media[0].caption == "Agenda на выходные" and albums[0].media[1].caption is None
+    links = [c for c in h.session.calls if isinstance(c, SendMessage) and c.chat_id == 2000 and c.reply_markup]
+    assert links and links[0].reply_markup.inline_keyboard[0][0].url == "https://businesscup.zimran.io"
+
+
+async def test_admin_stray_message_does_not_ask_contact(h, session):
+    await h.callback(SUPER, SUPER, "bc:new")
+    await h.text(SUPER, "Текст рассылки")
+    await h.photo(SUPER)  # на шаге кнопок прислали фото
+    assert "Не понял это сообщение" in h.session.last_text(SUPER)
+    await h.callback(SUPER, SUPER, "bc:nobuttons")  # состояние не сбилось
+    assert "Кому отправляем?" in h.session.last_text(SUPER)

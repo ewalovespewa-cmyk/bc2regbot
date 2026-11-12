@@ -4,7 +4,7 @@ import time
 
 from aiogram import Bot
 from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from aiogram.types import Message
 from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -19,14 +19,6 @@ from app.services.importer import team_display_name
 
 INVALID_LIMIT = (10, 600)  # неверных кодов за 10 минут
 PENDING_TTL = 600  # сколько живёт отложенный чекин, пока человек привязывает аккаунт
-
-
-def bingo_keyboard(settings: Settings, lang: str) -> InlineKeyboardMarkup | None:
-    if not settings.games_bot_username:
-        return None
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text=t("checkin.open_bingo", lang), url=f"https://t.me/{settings.games_bot_username}")]]
-    )
 
 
 async def reply_result(message: Message, result: CheckinResult, participant: Participant, session: AsyncSession, settings: Settings) -> None:
@@ -48,9 +40,8 @@ async def reply_result(message: Message, result: CheckinResult, participant: Par
                 "checkin.ok_team", lang, day=n, team=html.escape(team_display_name(team, lang)),
                 present=result.team_present, total=result.team_total,
             )
+        # Про бинго здесь не пишем: его открывают организаторы в своё время и объявляют постом.
         await message.answer(text, reply_markup=main_menu(lang))
-        if bingo := bingo_keyboard(settings, lang):
-            await message.answer(t("checkin.bingo", lang), reply_markup=bingo)
         return
     if result.status == CheckinStatus.CLOSED:
         await message.answer(t("checkin.closed", lang), reply_markup=main_menu(lang))

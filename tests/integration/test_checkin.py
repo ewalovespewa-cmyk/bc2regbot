@@ -68,10 +68,11 @@ def code_for(day_id: int, offset: float = 0) -> str:
 async def test_self_checkin_ok_already_and_team_count(h, session, world):
     await h.text(ARU, f"/start ci_{code_for(world.id)}")
     texts = h.session.texts(ARU)
-    assert "Есть отметка" in texts[-2] and "1/3 на месте" in texts[-2] and "Бинго открыто" in texts[-1]
+    assert "Есть отметка" in texts[-1] and "1/3 на месте" in texts[-1]
+    assert not any("Бинго" in x for x in texts)  # про бинго при отметке молчим
 
     await h.text(DANA, f"/start ci_{code_for(world.id)}")
-    assert "2/3 на месте" in h.session.texts(DANA)[-2]
+    assert "2/3 на месте" in h.session.texts(DANA)[-1]
 
     await h.text(ARU, f"/start ci_{code_for(world.id)}")
     assert "Отметка уже есть" in h.session.last_text(ARU)

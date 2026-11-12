@@ -99,8 +99,6 @@ poll:
 checkin:
   ok_team: "✅ <b>You're checked in!</b> Day {day}.\n👥 Team {team}: {present}/{total} here."
   ok_solo: "✅ <b>You're checked in!</b> Day {day}.\n\nHave a great hackathon 🚀"
-  bingo: "🎲 <b>Bingo is open!</b> Your card is waiting in the games bot."
-  open_bingo: "🎲 Open bingo"
   already: "👌 You're already checked in, time: {time}."
   expired: "⏱ The QR code has expired. Scan the screen at the entrance again."
   closed: "⚪ Check-in is closed right now. Please come to the registration desk🙏"

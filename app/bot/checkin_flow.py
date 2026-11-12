@@ -1,5 +1,4 @@
 """Общий сценарий самочекина: /start ci_<код> из QR, сканер в Mini App и отложенный чекин после привязки."""
-import html
 import time
 
 from aiogram import Bot
@@ -15,7 +14,6 @@ from app.db.models import EventDay, Participant
 from app.i18n import t
 from app.services import checkin_codes, ratelimit, security
 from app.services.checkin import CheckinResult, CheckinStatus, checkin_pending, day_number, is_open, self_checkin, today_day
-from app.services.importer import team_display_name
 
 INVALID_LIMIT = (10, 600)  # неверных кодов за 10 минут
 PENDING_TTL = 600  # сколько живёт отложенный чекин, пока человек привязывает аккаунт
@@ -32,16 +30,9 @@ async def reply_result(message: Message, result: CheckinResult, participant: Par
             at = result.checkin.created_at.astimezone(ZoneInfo(settings.timezone)).strftime("%H:%M")
             await message.answer(t("checkin.already", lang, time=at), reply_markup=main_menu(lang))
             return
-        team = participant.team
-        if team is None or team.is_solo:
-            text = t("checkin.ok_solo", lang, day=n)
-        else:
-            text = t(
-                "checkin.ok_team", lang, day=n, team=html.escape(team_display_name(team, lang)),
-                present=result.team_present, total=result.team_total,
-            )
+        # Всем один текст, без команды: составы ещё не финальные.
         # Про бинго здесь не пишем: его открывают организаторы в своё время и объявляют постом.
-        await message.answer(text, reply_markup=main_menu(lang))
+        await message.answer(t("checkin.ok", lang, day=n), reply_markup=main_menu(lang))
         return
     if result.status == CheckinStatus.CLOSED:
         await message.answer(t("checkin.closed", lang), reply_markup=main_menu(lang))

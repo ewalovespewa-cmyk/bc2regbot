@@ -97,8 +97,7 @@ poll:
   reason_skipped: "OK, no reason 👌"
 
 checkin:
-  ok_team: "✅ <b>You're checked in!</b> Day {day}.\n👥 Team {team}: {present}/{total} here."
-  ok_solo: "✅ <b>You're checked in!</b> Day {day}.\n\nGood luck at the hackathon! Have a great day 🚀"
+  ok: "✅ <b>You're checked in!</b> Day {day}.\n\nGood luck at the hackathon! Have a great day 🚀"
   already: "👌 You're already checked in, time: {time}."
   expired: "⏱ The QR code has expired. Scan the screen at the entrance again."
   closed: "⚪ Check-in is closed right now. Please come to the registration desk🙏"

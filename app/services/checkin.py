@@ -73,8 +73,18 @@ async def open_day(session: AsyncSession, day: EventDay, now: datetime | None = 
     await session.flush()
 
 
+TEST_DAY_PREFIXES = ("тест", "test", "🧪")
+
+
+def is_test_day(day: EventDay) -> bool:
+    """Тестовый день (название начинается с «Тест»/«Test»/🧪): делегаты его не видят в «Моём статусе»
+    и он не сдвигает нумерацию настоящих дней. Отметки в нём работают как обычно."""
+    return day.label.strip().lower().startswith(TEST_DAY_PREFIXES)
+
+
 def day_number(day: EventDay, days: list[EventDay]) -> int:
-    return next((i for i, d in enumerate(sorted(days, key=lambda d: d.date), start=1) if d.id == day.id), 1)
+    real = sorted((d for d in days if not is_test_day(d)), key=lambda d: d.date)
+    return next((i for i, d in enumerate(real, start=1) if d.id == day.id), 1)
 
 
 # ---------------------------------------------------------------- отметка

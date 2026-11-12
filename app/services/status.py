@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.checkin import is_test_day
 from app.db.models import Checkin, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption
 from app.i18n import t
 
@@ -41,7 +42,7 @@ async def build_status(
         lines.append("")
         lines.append(t("status.attendance", lang, answer=html.escape(answer)))
 
-    days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
+    days = [d for d in (await session.scalars(select(EventDay).order_by(EventDay.date))).all() if not is_test_day(d)]
     if days:
         checkins = {
             c.event_day_id: c.created_at

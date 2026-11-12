@@ -439,3 +439,30 @@ async def test_event_lock_keeps_access_when_row_removed(session, monkeypatch):
     await session.flush()
     report, _ = await sheet_sync.import_from_sheet(session, settings)
     assert report.deselected == 1
+
+
+async def test_bingo_test_access_sends_event_without_checkin(engine, redis, session):
+    settings = Settings(_env_file=None, superadmin_ids=frozenset({SUPER}), gamification_webhook_url="http://games.test/bc-events")
+    h = Harness(redis=redis, sessionmaker=create_sessionmaker(engine), settings=settings)
+    today, _ = await _seed_checkins(session)
+    checkins_before = await checkin_service.checkins_count(session)
+
+    await h.callback(SUPER, SUPER, "m:checkin")
+    assert "a:bgtest" in _buttons(_last_with_markup(h, SUPER))
+    await h.callback(SUPER, SUPER, "a:bgtest")
+    await h.text(SUPER, "777000111")
+    events = (await session.scalars(select(OutboundEvent).order_by(OutboundEvent.id))).all()
+    created = [e for e in events if e.type == "checkin.created" and e.payload.get("test")]
+    assert len(created) == 1 and created[0].payload["telegram_user_id"] == 777000111
+    assert created[0].payload["day"] == min(today.date, (await session.scalar(select(func.max(EventDay.date))))).isoformat()
+    assert await checkin_service.checkins_count(session) == checkins_before  # настоящих отметок не прибавилось
+
+    await h.callback(SUPER, SUPER, "a:bgtest:off:777000111")
+    session.expire_all()
+    cancelled = (await session.scalars(select(OutboundEvent).where(OutboundEvent.type == "checkin.cancelled"))).all()
+    assert any(e.payload.get("test") and e.payload["telegram_user_id"] == 777000111 for e in cancelled)
+
+
+async def test_bingo_test_hidden_without_games_bot(h):
+    await h.callback(SUPER, SUPER, "m:checkin")
+    assert "a:bgtest" not in _buttons(_last_with_markup(h, SUPER))

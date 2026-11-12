@@ -31,6 +31,7 @@ from app.bot.filters import RoleFilter
 from app.config import Settings
 from app.db.models import EventDay, Role
 from app.services import checkin as checkin_service
+from app.services import outbox
 from app.services import polls as poll_service
 from app.services.admins import ASSIGNABLE_ROLES, list_admins, remove_admin, resolve_user, set_admin
 from app.services.audit import log_admin_action
@@ -55,6 +56,7 @@ class AdminUI(StatesGroup):
     import_file = State()  # ждём CSV/XLSX
     day_text = State()  # «14.11 08:00-13:00 День 1»
     admin_ref = State()  # id или @username нового админа
+    bingo_tester = State()  # id или @username тестового аккаунта для бинго
 
 
 def _btn(text: str, data: str) -> InlineKeyboardButton:
@@ -350,6 +352,8 @@ async def on_checkin(callback: CallbackQuery, session: AsyncSession, settings: S
         rows.append([_btn(f"🔒 Режим мероприятия: {'включён' if locked else 'выключен'}", "a:lock:toggle")])
         if not locked:
             rows.append([_btn("🧹 Сбросить отметки и привязки (тест)", "m:reset")])
+        if settings.gamification_webhook_url:
+            rows.append([_btn("🧪 Тест бинго", "a:bgtest")])
     if links := screen_links_keyboard(settings):
         rows.append(links.inline_keyboard[0])
     rows.append([_btn("🚨 Подозрительное", "a:susp"), _btn("🔄 Обновить", "m:checkin")])
@@ -470,6 +474,60 @@ async def on_day_delete(callback: CallbackQuery, state: FSMContext, session: Asy
         await log_admin_action(session, callback.from_user.id, "day_delete", label, checkins=removed)
         await callback.message.answer(f"🗑 День «{html.escape(label)}» удалён, отметок удалено: {removed}.")
     await on_days(callback, state, session, settings, role)
+
+
+# --- тест бинго: доступ в бот игр одному аккаунту, без настоящей отметки
+
+
+async def _bingo_test_day(session: AsyncSession) -> EventDay | None:
+    return await session.scalar(select(EventDay).order_by(EventDay.date).limit(1))
+
+
+@router.callback_query(F.data == "a:bgtest", RoleFilter(Role.SUPERADMIN))
+async def on_bingo_test(callback: CallbackQuery, state: FSMContext) -> None:
+    await state.set_state(AdminUI.bingo_tester)
+    await callback.message.answer(
+        "🧪 <b>Тест бинго</b>\n"
+        "Бот игр получит событие «отметился на входе» только для одного аккаунта. Настоящей отметки нет: "
+        "ни в таблице, ни в «Моём статусе», ни у делегатов ничего не появится.\n\n"
+        "Пришли @username или Telegram ID тестового аккаунта. Он не должен быть OC в боте игр: OC видят бинго всегда.",
+        reply_markup=_kb([_btn("Отмена", "m:checkin")]),
+    )
+    await callback.answer()
+
+
+@router.message(AdminUI.bingo_tester, F.text, ~F.text.startswith("/"), RoleFilter(Role.SUPERADMIN))
+async def on_bingo_tester(message: Message, state: FSMContext, session: AsyncSession, redis: Redis) -> None:
+    user = await resolve_user(session, redis, message.text)
+    day = await _bingo_test_day(session)
+    if user is None:
+        await message.answer("Не нашёл такого. Пришли Telegram ID (цифрами) или @username того, кто уже писал боту.")
+        return
+    if day is None:
+        await state.clear()
+        await message.answer("Нет ни одного дня мероприятия — не за что отметить.")
+        return
+    await state.clear()
+    outbox.enqueue(session, outbox.CHECKIN_CREATED, {"telegram_user_id": user.id, "day": day.date.isoformat(), "test": True})
+    await log_admin_action(session, message.from_user.id, "bingo_test_on", str(user.id), day=day.date.isoformat())
+    who = f"@{user.username}" if user.username else str(user.id)
+    await message.answer(
+        f"🧪 Тестовый доступ к бинго отправлен для {html.escape(who)} (как будто отметился: {html.escape(day.label)}).\n"
+        "Через несколько секунд открой бот игр с этого аккаунта: в меню должна появиться «🎲 Бинго» "
+        "(если приём бинго включён). После проверки убери доступ кнопкой ниже.",
+        reply_markup=_kb([_btn("🧹 Убрать тестовый доступ", f"a:bgtest:off:{user.id}")], BACK),
+    )
+
+
+@router.callback_query(F.data.startswith("a:bgtest:off:"), RoleFilter(Role.SUPERADMIN))
+async def on_bingo_test_off(callback: CallbackQuery, session: AsyncSession) -> None:
+    user_id = int(callback.data.split(":")[3])
+    day = await _bingo_test_day(session)
+    if day is not None:
+        outbox.enqueue(session, outbox.CHECKIN_CANCELLED, {"telegram_user_id": user_id, "day": day.date.isoformat(), "test": True})
+        await log_admin_action(session, callback.from_user.id, "bingo_test_off", str(user_id))
+    await callback.answer("🧹 Тестовый доступ убран", show_alert=True)
+    await callback.message.edit_reply_markup(reply_markup=_kb(BACK))
 
 
 # --- режим мероприятия

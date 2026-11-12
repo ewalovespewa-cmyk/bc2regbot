@@ -334,7 +334,7 @@ async def test_attendance_replies(h, session):
     await h.callback(p0, p0, f"pl:{poll_id}:{no_id}")
     assert h.session.last_text(p0).startswith("Очень жаль😔") and "Напишите одним сообщением." in h.session.last_text(p0)
     await h.text(p0, "Экзамен")
-    assert h.session.last_text(p0).startswith("Спасибо, до скорой встречи!") and "отметиться заново" in h.session.last_text(p0)
+    assert h.session.last_text(p0).startswith("Спасибо, до скорой встречи!") and "Приду» в опросе выше" in h.session.last_text(p0)
 
 
 async def test_intro_goes_right_before_poll(h, session, settings, engine):

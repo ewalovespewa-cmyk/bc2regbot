@@ -466,3 +466,18 @@ async def test_bingo_test_access_sends_event_without_checkin(engine, redis, sess
 async def test_bingo_test_hidden_without_games_bot(h):
     await h.callback(SUPER, SUPER, "m:checkin")
     assert "a:bgtest" not in _buttons(_last_with_markup(h, SUPER))
+
+
+async def test_status_shows_only_days_with_checkin(session):
+    from app.services.status import build_status
+
+    today, other = await _seed_checkins(session)
+    people = (await session.scalars(select(Participant).order_by(Participant.id))).all()
+    first = await build_status(session, people[0], "ru", "Asia/Almaty", "https://t.me/x")
+    second = await build_status(session, people[1], "ru", "Asia/Almaty", "https://t.me/x")
+    assert "✅ День 1 — " in first and "✅ День 2 — " in first
+    assert "✅ День 1 — " in second and "День 2" not in second  # второго дня без отметки не видно
+    await session.execute(Checkin.__table__.delete())
+    await session.commit()
+    empty = await build_status(session, people[1], "ru", "Asia/Almaty", "https://t.me/x")
+    assert "Чекин" not in empty and "День" not in empty

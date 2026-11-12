@@ -68,8 +68,7 @@ status:
     Stay tuned in our <a href="{channel}">Telegram channel</a>, we'll share what's next soon 🚀
   attendance: "Attendance confirmation: <b>{answer}</b>"
   checkins: "\n<b>Check-in:</b>"
-  checked_at: "✅ checked in, {time}"
-  not_checked: "—"
+  checked_at: "✅ {day} — {time}"
 
 content:
   schedule: |-
@@ -86,15 +85,15 @@ content:
 poll:
   not_participant: "🔒 This poll is for participants only. Tap /start to get in."
   closed: "⌛ The poll is closed, we're no longer taking answers."
-  saved: "✅ Saved: {answer}. You can change it until the deadline."
+  saved: "✅ Saved: {answer}. You can change it at any time."
   coming: "Great, we'll be waiting for you! See you soon💙"
   ask_reason: |-
     So sorry to hear that😔 Could you tell us why you can't make it?
 
     Please send it in one message.
   skip: "Skip"
-  reason_thanks: "Thanks, see you soon!🙌🏽 If you change your mind, you can just answer again. We'll be waiting!"
-  reason_skipped: "OK, no reason 👌"
+  reason_thanks: "Thanks, see you soon!🙌🏽 If you change your mind, just tap “🟢 I'm coming” in the poll above. We'll be waiting!"
+  reason_skipped: "Thanks for letting us know! If you change your mind, just tap “🟢 I'm coming” in the poll above."
 
 checkin:
   ok: "✅ <b>You're checked in!</b> Day {day}.\n\nGood luck at the hackathon! Have a great day 🚀"

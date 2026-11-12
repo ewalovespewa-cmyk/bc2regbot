@@ -42,15 +42,19 @@ async def build_status(
         lines.append("")
         lines.append(t("status.attendance", lang, answer=html.escape(answer)))
 
-    days = [d for d in (await session.scalars(select(EventDay).order_by(EventDay.date))).all() if not is_test_day(d)]
+    # Только дни, где отметка уже есть: пустые «День 1: —», «День 2: —» до проекта путают
+    # (второй день — только для финалистов). Тестовые дни не показываем.
+    checkins = {
+        c.event_day_id: c.created_at
+        for c in (await session.scalars(select(Checkin).where(Checkin.participant_id == participant.id))).all()
+    }
+    days = [
+        d for d in (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
+        if d.id in checkins and not is_test_day(d)
+    ]
     if days:
-        checkins = {
-            c.event_day_id: c.created_at
-            for c in (await session.scalars(select(Checkin).where(Checkin.participant_id == participant.id))).all()
-        }
         lines.append(t("status.checkins", lang))
         for day in days:
-            at = checkins.get(day.id)
-            when = t("status.checked_at", lang, time=at.astimezone(tz).strftime("%H:%M")) if at else t("status.not_checked", lang)
-            lines.append(f"  {html.escape(day.label)}: {when}")
+            at = checkins[day.id].astimezone(tz).strftime("%H:%M")
+            lines.append(t("status.checked_at", lang, day=html.escape(day.label), time=at))
     return "\n".join(lines)

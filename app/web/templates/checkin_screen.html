@@ -9,15 +9,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800;900&family=Silkscreen&display=swap" rel="stylesheet">
 <style>
   /* Стиль сайта businesscup.zimran.io: фиолетовый градиент, пиксельная сетка, острые углы.
-     Лаймовый — только на «2.0» в названии, остальные акценты белые и тёмно-фиолетовые. */
+     Цвета сайта: фиолетовый #5b42dc, светлый фиолетовый #7367ff (пиксельные иконки), тёмный #271d67
+     (полоса партнёров), лавандовый #d3cdf2 (подписи). Лаймовый — только на «2.0» в названии. */
   :root {
     --violet: #5b42dc;
     --violet-2: #7367ff;
-    --deep: #2a1f6e;
+    --deep: #271d67;
+    --lavender: #d3cdf2;
     --ink: #0b0a12;
     --lime: #baff3b;
     --white: #ffffff;
-    --muted: #c3bdd3;
+    --muted: #d3cdf2;
     --line: rgba(255, 255, 255, 0.55);
     --pixel: "Silkscreen", "JetBrains Mono", monospace;
     --sans: "Inter", Arial, sans-serif;
@@ -57,17 +59,18 @@
   .chips { display: flex; flex-wrap: wrap; gap: 12px; }
   .chip { border: 1px solid var(--line); padding: .6em 1.1em; text-transform: uppercase; font-weight: 600;
     font-size: clamp(13px, 1.15vw, 20px); letter-spacing: .03em; display: inline-flex; gap: .55em; align-items: center; }
-  .chip.day { background: var(--white); color: var(--deep); border-color: var(--white); font-weight: 800; }
+  .chip.day { background: var(--white); color: var(--violet); border-color: var(--white); font-weight: 800; }
 
   .scan { font-weight: 800; text-transform: uppercase; line-height: 1.05; font-size: clamp(24px, 3vw, 56px); margin: 0; }
-  .scan .accent { color: var(--white); }
+  .scan .accent { color: var(--violet-2); }
   .hint { color: var(--muted); font-size: clamp(14px, 1.3vw, 22px); max-width: 34em; line-height: 1.4; margin: 0; }
 
   .steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 1.4vh; counter-reset: step; }
   .steps li { counter-increment: step; display: flex; align-items: center; gap: .8em;
     font-weight: 700; font-size: clamp(16px, 1.7vw, 30px); }
   .steps li::before { content: counter(step); flex: none; display: grid; place-items: center;
-    width: 1.7em; height: 1.7em; background: var(--white); color: var(--deep); font-weight: 900; }
+    width: 1.7em; height: 1.7em; background: var(--violet); color: var(--white); font-weight: 900;
+    box-shadow: inset 0 0 0 2px var(--violet-2); }
   .steps .btn { border: 1px solid var(--line); padding: .1em .45em; white-space: nowrap; }
   .steps .bot { color: var(--white); text-decoration: underline; text-underline-offset: .18em; }
 
@@ -76,8 +79,8 @@
   .qr { position: relative; background: var(--white); padding: 1.6vh;
     width: min(74vh, 46vw); aspect-ratio: 1; box-shadow: 0 0 0 1px var(--line), 0 30px 80px rgba(0,0,0,.45); }
   .qr svg { display: block; width: 100%; height: 100%; shape-rendering: crispEdges; }
-  /* белые «прицельные» уголки, как пиксельные рамки на сайте */
-  .qr::before, .qr::after, .qr > .c1, .qr > .c2 { content: ""; position: absolute; width: 9%; height: 9%; border: 6px solid var(--white); }
+  /* «прицельные» уголки цвета пиксельных иконок сайта */
+  .qr::before, .qr::after, .qr > .c1, .qr > .c2 { content: ""; position: absolute; width: 9%; height: 9%; border: 6px solid var(--violet-2); }
   .qr::before { top: -14px; left: -14px; border-right: 0; border-bottom: 0; }
   .qr::after { bottom: -14px; right: -14px; border-left: 0; border-top: 0; }
   .qr > .c1 { top: -14px; right: -14px; border-left: 0; border-bottom: 0; }
@@ -85,7 +88,7 @@
 
   .timer { width: min(74vh, 46vw); }
   .bar { height: 8px; background: rgba(255,255,255,.15); overflow: hidden; }
-  .bar > div { height: 100%; background: var(--white); transition: width 1s linear; }
+  .bar > div { height: 100%; background: linear-gradient(90deg, var(--violet), var(--violet-2)); transition: width 1s linear; }
   .timer .t { margin-top: 1vh; color: var(--muted); font-size: clamp(12px, 1vw, 18px); text-transform: uppercase;
     letter-spacing: .05em; font-variant-numeric: tabular-nums; display: flex; justify-content: space-between; }
 
@@ -96,7 +99,7 @@
   .closed span { display: block; margin-top: 2vh; color: var(--muted); font-size: clamp(14px, 1.3vw, 22px); }
 
   /* --- бегущая строка снизу, как на сайте --- */
-  .ticker { grid-column: 1 / -1; margin: 3vh -5vw 0; background: var(--ink); border-top: 1px solid rgba(255,255,255,.15);
+  .ticker { grid-column: 1 / -1; margin: 3vh -5vw 0; background: var(--deep); border-top: 1px solid rgba(255,255,255,.15);
     overflow: hidden; white-space: nowrap; font-family: var(--pixel); font-size: clamp(16px, 1.8vw, 32px);
     padding: 1.6vh 0; }
   .ticker span { display: inline-block; padding-left: 100%; animation: run 38s linear infinite; }

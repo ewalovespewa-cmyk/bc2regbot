@@ -157,8 +157,8 @@
     if (s.bot) el("bot").textContent = "@" + s.bot;
     if (s.state !== "open") {
       const [title, sub] = {
-        closed: ["Чекин закрыт", "Откроется в начале дня — подходи к волонтёрам у входа"],
-        screen_off: ["Экран на паузе", "Отметиться можно у волонтёров"],
+        closed: ["Чекин закрыт", "Подойди к регистрационной стойке"],
+        screen_off: ["Экран на паузе", "Подойди к регистрационной стойке"],
         misconfigured: ["Нет настроек", "Нужны CHECKIN_SECRET и имя бота"],
       }[s.state] || ["Чекин закрыт", ""];
       el("content").innerHTML = `<div class="closed"><div><b>${title}</b><span>${sub}</span></div></div>`;

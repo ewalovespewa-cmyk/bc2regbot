@@ -120,10 +120,78 @@ async def checkin_table(session: AsyncSession, day: EventDay, timezone: str) -> 
     return Table(checkin_tab_name(day), header, rows)
 
 
-async def all_tables(session: AsyncSession, timezone: str, passed_name: str = "Статус бота (BOT)") -> list[Table]:
+FINALISTS_COLORS = {"came": "C6EFCE", "outsider": "FFEB9C"}  # пришёл финалист / отмечен не финалист
+
+
+def finalists_tab_name(day: EventDay | None) -> str:
+    # Не начинается с «Чекин »: такие вкладки бот удаляет вместе с днями.
+    label = re.sub(r"[\[\]:*?/\\]", " ", day.label) if day else ""
+    return f"Финалисты · {label} (BOT)" if label else "Финалисты (BOT)"
+
+
+async def finalists_table(session: AsyncSession, timezone: str, finals_day: str) -> Table:
+    """Вкладка финала: все финалисты по командам, пришли ли в день финала. Внизу — отмеченные не финалисты."""
+    tz = ZoneInfo(timezone)
+    day = None
+    if finals_day:
+        day = await session.scalar(select(EventDay).where(EventDay.date == datetime.fromisoformat(finals_day).date()))
+    checkins: dict[int, Checkin] = {}
+    if day is not None:
+        checkins = {c.participant_id: c for c in (await session.scalars(select(Checkin).where(Checkin.event_day_id == day.id))).all()}
+    finalists = (
+        await session.scalars(select(Participant).where(Participant.is_selected, Participant.is_finalist))
+    ).all()
+    finalists = sorted(finalists, key=lambda p: (participant_team_name(p).lower(), p.full_name.lower()))
+    team_total: dict[str, int] = {}
+    team_came: dict[str, int] = {}
+    for p in finalists:
+        team = participant_team_name(p)
+        team_total[team] = team_total.get(team, 0) + 1
+        team_came[team] = team_came.get(team, 0) + (p.id in checkins)
+
+    header = ["Команда", "Имя", "Телефон", "Почта", "Telegram", "Открыл бота", "Пришёл", "Время", "Способ", "Команда на месте"]
+    rows: list[list[str]] = []
+    colors: list[str | None] = []
+
+    def row(p: Participant, came: str, color: str | None, team_mark: str) -> None:
+        c = checkins.get(p.id)
+        rows.append([
+            participant_team_name(p),
+            p.full_name,
+            p.phone or p.phone_raw or "",
+            p.email,
+            f"@{p.telegram_username}" if p.telegram_username else (f"@{p.tg_username_form}" if p.tg_username_form else ""),
+            YES if p.telegram_user_id else NO,
+            came,
+            _fmt(c.created_at, tz, "%H:%M") if c else "",
+            METHOD_TITLES.get(c.method, c.method.value) if c else "",
+            team_mark,
+        ])
+        colors.append(color)
+
+    for p in finalists:
+        team = participant_team_name(p)
+        came = p.id in checkins
+        row(p, YES if came else "", FINALISTS_COLORS["came"] if came else None, f"{team_came[team]}/{team_total[team]}")
+    finalist_ids = {p.id for p in finalists}
+    outsiders = [pid for pid in checkins if pid not in finalist_ids]
+    if outsiders:
+        for p in (await session.scalars(select(Participant).where(Participant.id.in_(outsiders)))).all():
+            row(p, "да, НЕ финалист", FINALISTS_COLORS["outsider"], "")
+    if not finalists:
+        rows.insert(0, ["Список финалистов пуст: впишите почты финалистов во вкладку «Финал (BOT)»", *[""] * (len(header) - 1)])
+        colors.insert(0, None)
+    return Table(finalists_tab_name(day), header, rows, row_colors=colors)
+
+
+async def all_tables(
+    session: AsyncSession, timezone: str, passed_name: str = "Статус бота (BOT)", finals_day: str = ""
+) -> list[Table]:
     tables = [await passed_table(session, timezone, passed_name)]
     for day in (await session.scalars(select(EventDay).order_by(EventDay.date))).all():
         tables.append(await checkin_table(session, day, timezone))
+    if finals_day:
+        tables.append(await finalists_table(session, timezone, finals_day))
     return tables
 
 

@@ -22,6 +22,7 @@ from app.bot import albums
 from app.bot.filters import RoleFilter
 from app.config import Settings
 from app.db.models import Broadcast, BroadcastStatus, EventDay, MediaType, Role, Team
+from app.services.checkin import is_test_day
 from app.services import segments
 from app.services.audit import log_admin_action
 from app.services.broadcast import (
@@ -226,6 +227,10 @@ async def _ask_segment(message: Message, state: FSMContext, session: AsyncSessio
     for d in days:
         rows.append([_btn(f"Отмечены · {d.label}", f"bc:seg:ci:{d.id}"), _btn(f"Не отмечены · {d.label}", f"bc:seg:nci:{d.id}")])
         rows.append([_btn(f"💌 «Ждём тебя»: придут, но не отмечены · {d.label}", f"bc:seg:wait:{d.id}")])
+    rows.append([_btn("🏆 Финалисты", "bc:seg:fin")])
+    for d in days:
+        if not is_test_day(d):
+            rows.append([_btn(f"🏆 Финалисты, не отмечены · {d.label}", f"bc:seg:finnci:{d.id}")])
     rows.append([_btn("🏷 Конкретная команда", "bc:seg:team"), _btn("🧍 Без команды", "bc:seg:solo")])
     rows.append([_btn("👥 Кастом", "bc:seg:custom"), _btn("🧪 Тест: только мне", "bc:seg:self")])
     await message.answer("Кому отправляем?", reply_markup=_kb(*rows))
@@ -248,6 +253,10 @@ def _segment_from_callback(data: str) -> dict | None:
             return {"type": segments.TEAM, "team_id": int(team_id)}
         case ["solo"]:
             return {"type": segments.SOLO}
+        case ["fin"]:
+            return {"type": segments.FINALISTS}
+        case ["finnci", day]:
+            return {"type": segments.FINALISTS_NOT_CHECKED_IN, "day_id": int(day)}
         case ["self"]:
             return {"type": segments.SELF}
     return None

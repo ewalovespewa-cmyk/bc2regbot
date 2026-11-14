@@ -283,7 +283,7 @@ async def on_import_sheet(callback: CallbackQuery, session: AsyncSession, settin
 
 @router.callback_query(F.data == "a:export", RoleFilter(Role.ADMIN))
 async def on_export(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
-    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet)
+    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet, finals_day=settings.finals_day)
     stamp = datetime.now(ZoneInfo(settings.timezone)).strftime("%Y%m%d_%H%M")
     tabs = ", ".join(f"«{t.name}» ({len(t.rows)})" for t in tables)
     await callback.message.answer_document(

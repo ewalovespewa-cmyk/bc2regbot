@@ -23,6 +23,8 @@ SOLO = "solo"
 SELF = "self"  # тестовая отправка только себе
 CUSTOM = "custom"  # participant_ids — «Кастом»: люди по списку
 POLL_PENDING = "poll_pending"  # poll_id — для напоминаний: не ответил или ответ «ещё не решил»
+FINALISTS = "finalists"  # есть во вкладке «Финал (BOT)»
+FINALISTS_NOT_CHECKED_IN = "finalists_not_checked_in"  # day_id — финалисты, ещё не отмеченные в этот день
 
 ANSWER_TITLES = {"yes": "ответили «Приду»", "no": "ответили «Не смогу»", "maybe": "ответили «Пока думаю»", "none": "не ответили на опрос"}
 
@@ -89,6 +91,10 @@ async def segment_query(session: AsyncSession, spec: dict[str, Any]) -> Select |
         return stmt.where(Participant.team_id.is_(None) | solo)
     if kind == CUSTOM:
         return stmt.where(Participant.id.in_(spec.get("participant_ids") or []))
+    if kind == FINALISTS:
+        return stmt.where(Participant.is_finalist)
+    if kind == FINALISTS_NOT_CHECKED_IN:
+        return stmt.where(Participant.is_finalist, ~_checked(spec["day_id"]))
     raise ValueError(f"Неизвестный сегмент: {kind}")
 
 
@@ -126,6 +132,10 @@ async def describe(session: AsyncSession, spec: dict[str, Any]) -> str:
         return "тест: только мне"
     if kind == CUSTOM:
         return f"кастом: {len(spec.get('participant_ids') or [])} чел. по списку"
+    if kind == FINALISTS:
+        return "финалисты"
+    if kind == FINALISTS_NOT_CHECKED_IN:
+        return f"финалисты, не отмеченные в {day_label}"
     return kind
 
 

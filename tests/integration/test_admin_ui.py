@@ -104,7 +104,7 @@ async def test_push_to_sheet_writes_all_tabs(session, monkeypatch):
             return []
 
     monkeypatch.setattr("app.services.sheet_sync.SheetsClient", FakeClient)
-    count = await push_status_to_sheet(session, Settings(_env_file=None, sheet_id="x", google_service_account_json="{}"))
+    count = await push_status_to_sheet(session, Settings(_env_file=None, sheet_id="x", google_service_account_json="{}", finals_day=""))
     assert count == 3 and written == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
 
 
@@ -352,7 +352,7 @@ async def test_sheet_written_only_when_changed(session, monkeypatch):
     monkeypatch.setattr(sheet_sync, "SheetsClient", _RecordingClient)
     monkeypatch.setattr(sheet_sync, "_last_written", {})
     monkeypatch.setattr(_RecordingClient, "written", [])
-    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}")
+    settings = Settings(_env_file=None, sheet_id="x", google_service_account_json="{}", finals_day="")
     today, _ = await _seed_checkins(session)
 
     await push_status_to_sheet(session, settings)

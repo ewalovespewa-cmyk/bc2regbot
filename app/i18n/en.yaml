@@ -103,6 +103,7 @@ checkin:
   need_link: "Almost there! Let's link your account first: tap “📱 Share contact” below, and we'll check you in right away."
   too_many: "⏳ Too many attempts. Please come to the registration desk🙏"
   ask_volunteer: "Please come to the registration desk🙏"
+  not_finalist: "🏆 Day 2 of the hackathon is for finalists only. If you think this is a mistake, please come to the registration desk🙏"
   phone_mismatch: "Your Telegram number doesn't match your application. Please come to the registration desk🙏"
   scan_with_camera: "📷 Point your phone camera at the QR on the screen at the entrance. Telegram will open the bot and check you in."
 

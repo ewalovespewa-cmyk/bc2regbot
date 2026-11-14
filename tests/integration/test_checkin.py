@@ -233,3 +233,61 @@ async def test_checkin_survives_failed_reply(h, session, world):
 
     await h.text(ARU, f"/start ci_{code_for(day_id)}")
     assert "Отметка уже есть" in h.session.last_text(ARU)
+
+
+# ---------------------------------------------------------------- день финала
+
+
+def _finals_harness(engine, redis, world) -> Harness:
+    s = Settings(_env_file=None, superadmin_ids=frozenset({SUPER}), admin_chat_id=-100, checkin_secret=SECRET,
+                 bot_username="bc_test_bot", finals_day=world.date.isoformat())
+    return Harness(redis=redis, sessionmaker=create_sessionmaker(engine), settings=s)
+
+
+async def test_finals_day_only_finalists_check_in(engine, redis, session, world):
+    h = _finals_harness(engine, redis, world)
+    dana = await session.scalar(select(Participant).where(Participant.telegram_user_id == DANA))
+    dana.is_finalist = True
+    await session.commit()
+
+    await h.text(ARU, f"/start ci_{code_for(world.id)}")  # Aru не финалист
+    assert "только для финалистов" in h.session.last_text(ARU) and "регистрационной стойке" in h.session.last_text(ARU)
+    assert await session.scalar(select(func.count()).select_from(Checkin)) == 0
+    assert any("Не финалист сканирует QR" in t and "Aru Bekova" in t for t in h.session.texts(-100))
+
+    await h.text(DANA, f"/start ci_{code_for(world.id)}")  # Dana финалист
+    assert "Есть отметка" in h.session.last_text(DANA)
+
+    await h.callback(VOL, VOL, f"ci:mark:{(await session.scalar(select(Participant.id).where(Participant.telegram_user_id == ARU)))}")
+    assert "нет в списке финалистов" in h.session.last_text(VOL)  # волонтёр может отметить, но видит пометку
+    assert await session.scalar(select(func.count()).select_from(Checkin)) == 2
+
+
+async def test_finals_day_without_list_lets_everyone_in(engine, redis, world):
+    h = _finals_harness(engine, redis, world)  # финалистов 0: вкладку не заполнили — никого не блокируем
+    await h.text(ARU, f"/start ci_{code_for(world.id)}")
+    assert "Есть отметка" in h.session.last_text(ARU)
+
+
+async def test_finalists_tab_and_segments(session, world):
+    from app.services import segments
+    from app.services.exports import all_tables
+
+    people = (await session.scalars(select(Participant).order_by(Participant.id))).all()
+    people[0].is_finalist = people[1].is_finalist = True  # Aru и Dana финалисты, New — нет
+    session.add_all([Checkin(participant_id=people[0].id, event_day_id=world.id, method=CheckinMethod.SELF_QR),
+                     Checkin(participant_id=people[2].id, event_day_id=world.id, method=CheckinMethod.VOLUNTEER, checked_by=VOL)])
+    await session.commit()
+
+    tables = await all_tables(session, "Asia/Almaty", finals_day=world.date.isoformat())
+    tab = tables[-1]
+    assert tab.name == "Финалисты · День 1 (BOT)"
+    by_name = {r[1]: r for r in tab.rows}
+    assert by_name["Aru Bekova"][6] == "да" and by_name["Aru Bekova"][9] == "1/2"
+    assert by_name["Dana Ospan"][6] == ""
+    assert by_name["New Person"][6] == "да, НЕ финалист"
+    assert tab.row_colors == ["C6EFCE", None, "FFEB9C"]
+
+    assert await segments.count_recipients(session, {"type": segments.FINALISTS}) == 2
+    # не отмечены сегодня: только Dana (у New нет Telegram, Aru пришла)
+    assert await segments.count_recipients(session, {"type": segments.FINALISTS_NOT_CHECKED_IN, "day_id": world.id}) == 1

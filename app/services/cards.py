@@ -48,6 +48,7 @@ async def participant_card(session: AsyncSession, p: Participant, role: Role | N
 
     answer = await attendance_answer(session, p.id, "ru")
     lines.append(f"Опрос «Придёшь?»: {esc(answer) if answer else '—'}")
+    lines.append("Финал: 🏆 да" if p.is_finalist else "Финал: нет в списке")
 
     days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
     if days:

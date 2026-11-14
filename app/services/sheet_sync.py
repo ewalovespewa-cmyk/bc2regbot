@@ -90,7 +90,7 @@ async def push_status_to_sheet(session: AsyncSession, settings: Settings, *, for
 
     Возвращает число отобранных.
     """
-    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet)
+    tables = await all_tables(session, settings.timezone, settings.sheet_status_worksheet, finals_day=settings.finals_day)
     now = time.monotonic()
     changed = []
     for table in tables:

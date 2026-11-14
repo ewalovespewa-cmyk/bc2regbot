@@ -75,6 +75,14 @@ async def finalists(ctx: JobContext) -> None:
             return
         await session.commit()
     log.info("finalists_synced", count=count, unknown=len(unknown))
+    from app.services.checkin import local_today
+
+    if count == 0 and ctx.settings.finals_day and local_today(ctx.settings).isoformat() == ctx.settings.finals_day:
+        await _sheet_problem(
+            ctx, "finalists_empty_on_finals_day",
+            f"Сегодня финал, а вкладка «{ctx.settings.sheet_finalists_worksheet}» пустая. Пока она пустая, "
+            "QR отмечает всех подряд. Впишите туда почты финалистов.",
+        )
     if unknown:
         await _sheet_problem(
             ctx, "finalists_unknown",

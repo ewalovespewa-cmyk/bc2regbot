@@ -26,6 +26,7 @@ from app.services.checkin import (
     is_open,
     manual_checkin,
     open_day,
+    is_finals_day,
     today_day,
     upsert_day_from_text,
 )
@@ -94,7 +95,8 @@ async def on_mark(callback: CallbackQuery, session: AsyncSession, settings: Sett
         await callback.answer(f"Уже отмечен в {at}", show_alert=True)
         return
     team = f" · команда {result.team_present}/{result.team_total}" if p.team and not p.team.is_solo else ""
-    await callback.message.answer(f"✅ {html.escape(p.full_name)} отмечен(а): {html.escape(day.label)}{team}")
+    warn = "\n⚠️ Его нет в списке финалистов (вкладка «Финал (BOT)»)." if is_finals_day(day, settings) and not p.is_finalist else ""
+    await callback.message.answer(f"✅ {html.escape(p.full_name)} отмечен(а): {html.escape(day.label)}{team}{warn}")
     await callback.answer()
 
 

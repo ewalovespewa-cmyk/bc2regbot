@@ -19,6 +19,7 @@ class CheckinStatus(StrEnum):
     ALREADY = "already"
     INVALID_CODE = "invalid_code"
     CLOSED = "closed"
+    NOT_FINALIST = "not_finalist"  # день финала, а человека нет в списке финалистов
 
 
 @dataclass
@@ -137,6 +138,34 @@ async def record_checkin(
     return checkin, new_id is not None
 
 
+# ---------------------------------------------------------------- день финала
+
+
+def is_finals_day(day: EventDay | None, settings: Settings) -> bool:
+    return bool(day is not None and settings.finals_day and day.date.isoformat() == settings.finals_day)
+
+
+async def finalists_count(session: AsyncSession) -> int:
+    return await session.scalar(
+        select(func.count()).select_from(Participant).where(Participant.is_selected, Participant.is_finalist)
+    ) or 0
+
+
+async def _finals_gate(session: AsyncSession, participant: Participant, day: EventDay, settings: Settings) -> CheckinResult | None:
+    """В день финала самоотметка только для финалистов. Пустой список финалистов — не ограничиваем никого,
+    иначе ошибка с вкладкой закрыла бы вход всем. Уже отмеченного (например, волонтёром) не трогаем."""
+    if not is_finals_day(day, settings) or participant.is_finalist:
+        return None
+    if await finalists_count(session) == 0:
+        return None
+    already = await session.scalar(
+        select(Checkin.id).where(Checkin.participant_id == participant.id, Checkin.event_day_id == day.id)
+    )
+    if already is not None:
+        return None
+    return CheckinResult(CheckinStatus.NOT_FINALIST, day)
+
+
 async def self_checkin(
     session: AsyncSession, participant: Participant, code: str, settings: Settings, now: datetime | None = None
 ) -> CheckinResult:
@@ -147,6 +176,8 @@ async def self_checkin(
         return CheckinResult(CheckinStatus.CLOSED, day)
     if not checkin_codes.is_valid(settings.checkin_secret, day.id, code, now.timestamp()):
         return CheckinResult(CheckinStatus.INVALID_CODE, day)
+    if blocked := await _finals_gate(session, participant, day, settings):
+        return blocked
     return await _finish(session, participant, day, CheckinMethod.SELF_QR, None)
 
 
@@ -157,6 +188,8 @@ async def checkin_pending(
     day = await session.get(EventDay, day_id)
     if day is None or not is_open(day, now):
         return CheckinResult(CheckinStatus.CLOSED, day)
+    if blocked := await _finals_gate(session, participant, day, settings):
+        return blocked
     return await _finish(session, participant, day, CheckinMethod.SELF_QR, None)
 
 

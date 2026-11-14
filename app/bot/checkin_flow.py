@@ -1,4 +1,5 @@
 """Общий сценарий самочекина: /start ci_<код> из QR, сканер в Mini App и отложенный чекин после привязки."""
+import html
 import time
 
 from aiogram import Bot
@@ -19,8 +20,31 @@ INVALID_LIMIT = (10, 600)  # неверных кодов за 10 минут
 PENDING_TTL = 600  # сколько живёт отложенный чекин, пока человек привязывает аккаунт
 
 
-async def reply_result(message: Message, result: CheckinResult, participant: Participant, session: AsyncSession, settings: Settings) -> None:
+async def _report_not_finalist(message: Message, participant: Participant, result: CheckinResult, settings: Settings,
+                              redis: Redis | None) -> None:
+    from app.services.importer import participant_team_name
+    from app.services.notify import notify_admins
+
+    user = message.from_user
+    who = f"@{user.username}" if user and user.username else str(user.id if user else "")
+    await notify_admins(
+        message.bot, settings,
+        f"🏆 <b>Не финалист сканирует QR</b> ({html.escape(result.day.label)})\n"
+        f"{html.escape(participant.full_name)} · {html.escape(participant_team_name(participant))} · {html.escape(who)}\n"
+        f"Почта: {html.escape(participant.email)}\n"
+        "Отметки нет, его направили к стойке. Если он финалист — добавьте почту во вкладку «Финал (BOT)» "
+        "или отметьте вручную через /find.",
+        redis=redis, throttle_key=f"not_finalist:{participant.id}", throttle_seconds=900,
+    )
+
+
+async def reply_result(message: Message, result: CheckinResult, participant: Participant, session: AsyncSession, settings: Settings,
+                       redis: Redis | None = None) -> None:
     lang = participant.lang
+    if result.status == CheckinStatus.NOT_FINALIST:
+        await message.answer(t("checkin.not_finalist", lang), reply_markup=main_menu(lang))
+        await _report_not_finalist(message, participant, result, settings, redis)
+        return
     if result.status in (CheckinStatus.OK, CheckinStatus.ALREADY):
         days = (await session.scalars(select(EventDay))).all()
         n = day_number(result.day, list(days))
@@ -86,7 +110,7 @@ async def handle_code(
     await session.commit()  # отметка важнее ответа: сбой отправки не должен её откатить
     if result.status == CheckinStatus.INVALID_CODE and await _too_many_invalid(message, session, bot, redis, settings, lang):
         return
-    await reply_result(message, result, participant, session, settings)
+    await reply_result(message, result, participant, session, settings, redis)
 
 
 async def finish_pending(

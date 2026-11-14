@@ -6,10 +6,13 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings
+from app.logs import get_logger
 from app.services.exports import Table, all_tables
 from app.services.importer import ImportAborted, ImportReport, TeamsReport, assign_teams, import_applications, mark_finalists
 from app.services.settings_store import EVENT_LOCK, get_setting
 from app.services.sources import Row, SheetMissing, SheetsClient
+
+log = get_logger(__name__)
 
 
 async def import_rows(
@@ -76,6 +79,7 @@ async def sync_finalists(session: AsyncSession, settings: Settings) -> tuple[int
         raise ImportAborted(f"Лист «{name}»: {exc}") from exc
 
 
+_tabs_logged = False  # список вкладок пишем в лог один раз после запуска
 REWRITE_EVERY_SECONDS = 1800  # даже без изменений: вкладку могли испортить руками
 _last_written: dict[tuple[str, str], tuple[str, float]] = {}  # (таблица, вкладка) → (отпечаток, когда)
 
@@ -101,7 +105,13 @@ async def push_status_to_sheet(session: AsyncSession, settings: Settings, *, for
     if changed:
         client = SheetsClient(settings)
         await client.write_tables(changed)
-        await client.remove_stale_checkin_tabs({table.name for table in tables})
+        removed = await client.remove_stale_checkin_tabs({table.name for table in tables})
+        if removed:
+            log.info("sheet_tabs_removed", tabs=removed)
+        global _tabs_logged
+        if not _tabs_logged:
+            log.info("sheet_tabs", tabs=await client.list_titles())
+            _tabs_logged = True
         for table in changed:
             _last_written[(settings.sheet_id, table.name)] = (_fingerprint(table), now)
     return len(tables[0].rows)

@@ -103,6 +103,9 @@ async def test_push_to_sheet_writes_all_tabs(session, monkeypatch):
         async def remove_stale_checkin_tabs(self, keep):
             return []
 
+        async def list_titles(self):
+            return []
+
     monkeypatch.setattr("app.services.sheet_sync.SheetsClient", FakeClient)
     count = await push_status_to_sheet(session, Settings(_env_file=None, sheet_id="x", google_service_account_json="{}", finals_day=""))
     assert count == 3 and written == ["Статус бота (BOT)", "Чекин День 1 (BOT)", "Чекин День 2 (BOT)"]
@@ -343,6 +346,9 @@ class _RecordingClient:
         type(self).written.extend(t.name for t in tables)
 
     async def remove_stale_checkin_tabs(self, keep):
+        return []
+
+    async def list_titles(self):
         return []
 
 

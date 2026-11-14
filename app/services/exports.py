@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Checkin, CheckinMethod, EventDay, Participant, Poll, PollAnswer, PollKind, PollOption
+from app.services.checkin import is_test_day
 from app.services.importer import participant_team_name
 
 YES, NO = "да", "нет"
@@ -52,7 +53,7 @@ async def _attendance(session: AsyncSession) -> dict[int, tuple[str, str | None,
 async def passed_table(session: AsyncSession, timezone: str, name: str = "Статус бота (BOT)") -> Table:
     """Вкладка «Статус бота»: строка = отобранный участник, цвет строки = ответ на опрос."""
     tz = ZoneInfo(timezone)
-    days = (await session.scalars(select(EventDay).order_by(EventDay.date))).all()
+    days = [d for d in (await session.scalars(select(EventDay).order_by(EventDay.date))).all() if not is_test_day(d)]
     answers = await _attendance(session)
     checkins = {(c.participant_id, c.event_day_id): c.created_at for c in (await session.scalars(select(Checkin))).all()}
     participants = (
@@ -176,8 +177,10 @@ async def finalists_table(session: AsyncSession, timezone: str, finals_day: str)
     finalist_ids = {p.id for p in finalists}
     outsiders = [pid for pid in checkins if pid not in finalist_ids]
     if outsiders:
+        # Пока список финалистов пуст, «не финалист» — неправда: просто показываем, кто пришёл.
+        label, color = ("да, НЕ финалист", FINALISTS_COLORS["outsider"]) if finalists else (YES, None)
         for p in (await session.scalars(select(Participant).where(Participant.id.in_(outsiders)))).all():
-            row(p, "да, НЕ финалист", FINALISTS_COLORS["outsider"], "")
+            row(p, label, color, "")
     if not finalists:
         rows.insert(0, ["Список финалистов пуст: впишите почты финалистов во вкладку «Финал (BOT)»", *[""] * (len(header) - 1)])
         colors.insert(0, None)
@@ -187,8 +190,13 @@ async def finalists_table(session: AsyncSession, timezone: str, finals_day: str)
 async def all_tables(
     session: AsyncSession, timezone: str, passed_name: str = "Статус бота (BOT)", finals_day: str = ""
 ) -> list[Table]:
+    """«Статус бота», «Чекин <день>» на каждый настоящий день и вкладка финалистов.
+    День финала отдельной вкладкой «Чекин …» не пишем: всех пришедших показывает вкладка финалистов.
+    Тестовые дни («Тест…») в таблицу не попадают."""
     tables = [await passed_table(session, timezone, passed_name)]
     for day in (await session.scalars(select(EventDay).order_by(EventDay.date))).all():
+        if is_test_day(day) or (finals_day and day.date.isoformat() == finals_day):
+            continue
         tables.append(await checkin_table(session, day, timezone))
     if finals_day:
         tables.append(await finalists_table(session, timezone, finals_day))

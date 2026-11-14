@@ -223,6 +223,9 @@ class SheetsClient:
 
         await self._call(create, f"создать лист «{name}»")
 
+    async def list_titles(self) -> list[str]:
+        return await self._call(lambda: [ws.title for ws in self._open().worksheets()], "прочитать список вкладок")
+
     async def remove_stale_checkin_tabs(self, keep: set[str]) -> list[str]:
         """Удаляет вкладки «Чекин … (BOT)» удалённых дней. Трогает только вкладки бота."""
 

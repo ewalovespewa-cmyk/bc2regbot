@@ -291,3 +291,16 @@ async def test_finalists_tab_and_segments(session, world):
     assert await segments.count_recipients(session, {"type": segments.FINALISTS}) == 2
     # не отмечены сегодня: только Dana (у New нет Telegram, Aru пришла)
     assert await segments.count_recipients(session, {"type": segments.FINALISTS_NOT_CHECKED_IN, "day_id": world.id}) == 1
+
+
+async def test_sheet_skips_test_day_and_finals_checkin_tab(session, world):
+    from app.services.exports import all_tables
+
+    session.add(EventDay(date=world.date - timedelta(days=3), label="Тест", checkin_opens_at=datetime.now(UTC),
+                         checkin_closes_at=datetime.now(UTC) + timedelta(hours=1)))
+    await session.commit()
+    names = [t.name for t in await all_tables(session, "Asia/Almaty")]
+    assert names == ["Статус бота (BOT)", "Чекин День 1 (BOT)"]  # тестового дня нет
+    assert not any("Тест" in h for h in (await all_tables(session, "Asia/Almaty"))[0].header)
+    names = [t.name for t in await all_tables(session, "Asia/Almaty", finals_day=world.date.isoformat())]
+    assert names == ["Статус бота (BOT)", "Финалисты · День 1 (BOT)"]  # день финала — только вкладка финалистов
